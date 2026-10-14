@@ -42,7 +42,7 @@ Basically all of **Overstrike**'s features but rebuilt for Batman Arkham Knight,
 
 ## Requirements
 
-Windows 10/11 x64. The small release also needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0); the standalone one needs nothing.
+Windows 10/11 x64. The small release also needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ## License
 
