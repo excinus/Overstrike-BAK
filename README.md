@@ -1,18 +1,44 @@
+<img width="1672" height="483" alt="ov9" src="https://github.com/user-attachments/assets/82a5a500-d9ac-4b21-bfc5-d328bea4105d" />
+
 # Overstrike-BAK
 
-A mod manager for **Batman: Arkham Knight** (PC) by excinus, based on [Overstrike](https://github.com/Tkachov/Overstrike) by Tkachov.
+A mod manager for **Batman: Arkham Knight**, based on [Overstrike](https://github.com/Tkachov/Overstrike) by Tkachov.
 
 ## Features
 
-- **DLC skin mods and [BmSDK](https://github.com/Team-BmSDK/BmSDK-AK) script mods**: add archives or folders, tick what you want, press Apply. BmSDK is installed for you if it's missing.
-- **No duplicate files**: mods are moved between the library and the game, never copied.
-- **Presets**: save sets of ticked mods and switch between them.
-- **Nexus Mods integration**: mod names and pages, automatic linking of Nexus downloads, and an arrow when an update is out.
-- **Easy updates**: add the new version and it replaces the old one, installed in the same place.
-- **Suits Menu**: see the in-game Showcase with real thumbnails, drag suits to reorder them, and rename them.
-- **Backups**: every game file is backed up before it's changed, and the original order can be restored at any time.
+Basically all of **Overstrike**'s features but rebuilt for Batman Arkham Knight, and more.
 
-TFC Installer mods (like the Community Patch) are not supported; use [TFC Installer](https://www.nexusmods.com/site/mods/588) for those.
+<h3 align="center">MODS TAB</h3>
+
+<p align="center">
+  <img width="1334" height="917" alt="ov3" src="https://github.com/user-attachments/assets/447cabe9-fe8e-4a07-b4ae-1ba2f759ba38" />
+</p>
+
+
+- DLC skin mods & BmSDK script mods.
+- BmSDK automatically installs if not detected
+- Detects already installed mods (done automatically on first launch, or manually by pressing "import from game")
+- Install mods by drag&drop or by using "+" button.
+- Automatically links Nexus metadata when installing from a zip (if this doesn't work you can set the link manually)
+- Automatically checks for updates from Nexus
+
+<h3 align="center">SUITS MENU</h3>
+
+<p align="center">
+  </p><img width="1327" height="912" alt="ov7" src="https://github.com/user-attachments/assets/ed32e179-ef27-450f-9da3-d9f515eea0a1" />
+</p>
+
+- GUI which shows suits & batmobile grids in the exact order as they appear in-game
+- Clicking on a grid shows useful info
+- You can drag suits around to reorder them
+- You can create & load presets (as backups, one is already created at launch)
+
+---
+
+## CREDITS
+
+- [Overstrike](https://github.com/Tkachov/Overstrike) by Tkachov
+- [BmSDK](https://github.com/Team-BmSDK/BmSDK-AK) by Team-BmSDK
 
 ## Requirements
 
