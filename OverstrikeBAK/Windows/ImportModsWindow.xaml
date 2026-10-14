@@ -1,0 +1,48 @@
+<Window x:Class="OverstrikeBAK.Windows.ImportModsWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:mods="clr-namespace:OverstrikeBAK.Mods"
+		Title="Import mods from the game folder" Height="480" Width="760" MinHeight="300" MinWidth="500" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}" Icon="pack://application:,,,/Properties/Resources/icon.ico">
+	<Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}">
+		<Grid Margin="8">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<RowDefinition />
+				<RowDefinition Height="36" />
+			</Grid.RowDefinitions>
+
+			<TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SubtleTextBrush}">
+				Mods found in the game folder. Importing just adds them to the Mods tab: nothing is copied and they stay installed.
+				Official DLC and Community Patch folders aren't listed.
+			</TextBlock>
+
+			<ListView Grid.Row="1" x:Name="ModsList" ItemContainerStyle="{StaticResource GridListItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+				<ListView.View>
+					<GridView>
+						<GridViewColumn Width="34">
+							<GridViewColumn.CellTemplate>
+								<DataTemplate DataType="{x:Type mods:FoundGameMod}">
+									<CheckBox IsChecked="{Binding Import}" />
+								</DataTemplate>
+							</GridViewColumn.CellTemplate>
+						</GridViewColumn>
+						<GridViewColumn Header="Type" Width="70" DisplayMemberBinding="{Binding TypeText}" />
+						<GridViewColumn Header="Name" Width="210" DisplayMemberBinding="{Binding Name}" />
+						<GridViewColumn Header="Location" Width="400" DisplayMemberBinding="{Binding RelativePath}" />
+					</GridView>
+				</ListView.View>
+			</ListView>
+
+			<Grid Grid.Row="2">
+				<StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+					<Button Content="Select all" Width="80" Height="22" Click="SelectAll_Click" />
+					<Button Content="Select none" Width="80" Height="22" Margin="6,0,0,0" Click="SelectNone_Click" />
+				</StackPanel>
+				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+					<Button x:Name="ImportButton" Content="Import selected" Style="{StaticResource AccentButton}" Width="120" Height="22" IsDefault="True" Click="Import_Click" />
+					<Button Content="Not now" Width="80" Height="22" Margin="6,0,0,0" IsCancel="True" />
+				</StackPanel>
+			</Grid>
+		</Grid>
+	</Border>
+</Window>

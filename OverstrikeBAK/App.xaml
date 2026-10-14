@@ -1,0 +1,14 @@
+<Application x:Class="OverstrikeBAK.App"
+			xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+			xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<Application.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<!-- [0] colors: swapped at runtime by Utils.Theme -->
+				<ResourceDictionary Source="Themes/Dark.xaml" />
+				<ResourceDictionary Source="Themes/Logo.xaml" />
+				<ResourceDictionary Source="Themes/Controls.xaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</Application.Resources>
+</Application>

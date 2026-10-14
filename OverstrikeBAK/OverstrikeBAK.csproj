@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Overstrike-BAK</AssemblyName>
+    <RootNamespace>OverstrikeBAK</RootNamespace>
+    <ApplicationIcon>Properties\Resources\icon.ico</ApplicationIcon>
+
+    <Authors>excinus; Overstrike by Tkachov</Authors>
+    <Product>Overstrike-BAK</Product>
+    <Description>Mod manager for Batman: Arkham Knight (DLC skin mods and BmSDK script mods), forked from Overstrike.</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+
+    <RepositoryUrl>https://github.com/MirrorSim/Overstrike-BAK/</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Properties\Resources\icon.ico" />
+    <Resource Include="Properties\Resources\banner_logo.png" />
+    <Resource Include="Properties\Resources\banner_batman.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
+  </ItemGroup>
+
+</Project>

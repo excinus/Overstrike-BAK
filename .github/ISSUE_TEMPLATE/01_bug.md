@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 <!--
-    Thank you for taking your time to report a bug in Overstrike.
+    Thank you for taking your time to report a bug in Overstrike-BAK.
     Please read the following carefully before creating the issue.
 
     Before reporting a bug, please make sure that:
@@ -18,9 +18,9 @@ assignees: ''
     - that bug is not already reported by someone else.
 
     If it's a bug in someone else's tool, or in the game itself, it could be
-    that there's nothing that can be done from Overstrike side. Such bugs still
+    that there's nothing that can be done from Overstrike-BAK side. Such bugs still
     could be reported to see if some kind of workaround could be implemented in
-    Overstrike to prevent or mitigate the bug.
+    Overstrike-BAK to prevent or mitigate the bug.
 
     In the report, please add as much technical details as possible, because
     it could be that the bug only reproduces under specific circumstances only.
@@ -44,12 +44,12 @@ assignees: ''
 
     If applicable, add screenshots to help explain your problem.
 
-    If bug happens during mods installation, see if any useful information
+    If bug happens while installing a mod or saving the suit order, see if any useful information
     is in 'errors.log' file, and post an excerpt from it.
 
     Some of the technical details that could be useful:
-    - Overstrike version;
-    - game version;
+    - Overstrike-BAK version;
+    - game version (Steam/Epic/GOG), BmSDK version if script mods are involved;
     - your platform (operating system & specs).
 
     Don't include this text (between < and >) in your report.

@@ -1,0 +1,28 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+					xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<!-- Arkham Knight: near-black steel blues, cold grey text, cyan accents -->
+	<SolidColorBrush x:Key="WindowBrush" Color="#0B1015" />
+	<SolidColorBrush x:Key="PanelBrush" Color="#111A22" />
+	<SolidColorBrush x:Key="PanelAltBrush" Color="#0E151C" />
+	<SolidColorBrush x:Key="InputBrush" Color="#0A1117" />
+	<SolidColorBrush x:Key="BorderBrush" Color="#24333F" />
+	<SolidColorBrush x:Key="BorderStrongBrush" Color="#33495A" />
+	<SolidColorBrush x:Key="TextBrush" Color="#D5DEE3" />
+	<SolidColorBrush x:Key="SubtleTextBrush" Color="#8DA1AD" />
+	<SolidColorBrush x:Key="FaintTextBrush" Color="#5F7684" />
+	<SolidColorBrush x:Key="AccentBrush" Color="#3CD5F2" />
+	<SolidColorBrush x:Key="AccentTextBrush" Color="#04121A" />
+	<SolidColorBrush x:Key="HoverBrush" Color="#182532" />
+	<SolidColorBrush x:Key="PressedBrush" Color="#0F1A24" />
+	<SolidColorBrush x:Key="SelectionBrush" Color="#123A48" />
+	<SolidColorBrush x:Key="SelectionInactiveBrush" Color="#16262F" />
+	<SolidColorBrush x:Key="ButtonBrush" Color="#16212B" />
+	<SolidColorBrush x:Key="ErrorBrush" Color="#FF4D6A" />
+	<SolidColorBrush x:Key="WarningBrush" Color="#FFB000" />
+	<SolidColorBrush x:Key="SuccessBrush" Color="#4CD787" />
+	<SolidColorBrush x:Key="ScrollThumbBrush" Color="#2A3B48" />
+	<SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#3B5163" />
+	<SolidColorBrush x:Key="OverlayBrush" Color="#C8000000" />
+	<SolidColorBrush x:Key="TabStripBrush" Color="#0B1015" />
+	<SolidColorBrush x:Key="LinkBrush" Color="#3CD5F2" />
+</ResourceDictionary>

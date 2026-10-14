@@ -1,0 +1,16 @@
+<Window x:Class="OverstrikeBAK.Windows.TextPromptWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		Title="Overstrike-BAK" Height="140" Width="420" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}" Icon="pack://application:,,,/Properties/Resources/icon.ico">
+	<Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}">
+		<Grid Margin="8">
+			<TextBlock x:Name="PromptLabel" Text="Name:" VerticalAlignment="Top" />
+			<TextBox x:Name="ValueTextBox" Height="22" Padding="1" VerticalAlignment="Top" Margin="0,22,0,0" TextChanged="ValueTextBox_TextChanged" />
+			<TextBlock x:Name="ErrorLabel" Text="" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Bottom" Margin="0,0,170,4" TextTrimming="CharacterEllipsis" />
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+				<Button x:Name="OkButton" Content="OK" Style="{StaticResource AccentButton}" Width="75" Height="22" IsDefault="True" Click="OkButton_Click" />
+				<Button Content="Cancel" Width="75" Height="22" Margin="6,0,0,0" IsCancel="True" />
+			</StackPanel>
+		</Grid>
+	</Border>
+</Window>

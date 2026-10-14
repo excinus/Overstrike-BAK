@@ -1,0 +1,279 @@
+<UserControl x:Class="OverstrikeBAK.Tabs.SuitsMenu"
+			xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+			xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			xmlns:local="clr-namespace:OverstrikeBAK.Tabs">
+
+	<UserControl.Resources>
+		<!-- page tabs: SUITS / BATMOBILES, like the Showcase category tabs -->
+		<Style x:Key="PageTab" TargetType="{x:Type RadioButton}">
+			<Setter Property="Foreground" Value="#7FA3B3" />
+			<Setter Property="FontFamily" Value="Bahnschrift SemiBold Condensed, Segoe UI" />
+			<Setter Property="FontSize" Value="17" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Margin" Value="0,0,22,0" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="{x:Type RadioButton}">
+						<StackPanel Background="Transparent">
+							<ContentPresenter Margin="0,0,0,3" />
+							<Rectangle x:Name="Underline" Height="2" Fill="#3FD8E8" Visibility="Hidden" />
+						</StackPanel>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter Property="Foreground" Value="#FFFFFF" />
+								<Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+							</Trigger>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter Property="Foreground" Value="#C9D6DC" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!-- character filter chips -->
+		<Style x:Key="CharacterChip" TargetType="{x:Type RadioButton}">
+			<Setter Property="Foreground" Value="#9FBCC8" />
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Margin" Value="0,0,6,6" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="{x:Type RadioButton}">
+						<Border x:Name="Chip" Background="#0A2430" BorderBrush="#1D4655" BorderThickness="1" CornerRadius="10" Padding="10,2,10,3">
+							<ContentPresenter />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="BorderBrush" Value="#3FD8E8" />
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Chip" Property="Background" Value="#3FD8E8" />
+								<Setter TargetName="Chip" Property="BorderBrush" Value="#3FD8E8" />
+								<Setter Property="Foreground" Value="#03121A" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!-- grid cells -->
+		<Style x:Key="SuitCellContainer" TargetType="{x:Type ListBoxItem}">
+			<Setter Property="Margin" Value="3" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="{x:Type ListBoxItem}">
+						<Border x:Name="Bd" BorderThickness="2" BorderBrush="Transparent" Background="Transparent" SnapsToDevicePixels="True">
+							<ContentPresenter />
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="#2F7F8C" />
+							</Trigger>
+							<Trigger Property="IsSelected" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="#3FD8E8" />
+								<Setter TargetName="Bd" Property="Background" Value="#183FD8E8" />
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!-- suits: 5 portrait tiles per row, like the Showcase "Players" grid (ListControllerItemTall) -->
+		<ItemsPanelTemplate x:Key="SuitsPanel">
+			<WrapPanel Width="520" HorizontalAlignment="Center" />
+		</ItemsPanelTemplate>
+
+		<!-- Batmobiles: a single column of landscape tiles, like the in-game list -->
+		<ItemsPanelTemplate x:Key="BatmobilesPanel">
+			<StackPanel HorizontalAlignment="Center" />
+		</ItemsPanelTemplate>
+
+		<DataTemplate x:Key="SuitCellTemplate" DataType="{x:Type local:SuitView}">
+			<Border x:Name="Cell" Width="94" Height="210" Background="#0A2430" BorderBrush="#2A5866" BorderThickness="1" ToolTip="{Binding ToolTip}" ClipToBounds="True">
+				<Border.ContextMenu>
+					<ContextMenu>
+						<MenuItem Header="Show in Mods list" Click="ShowInModsList_Click" IsEnabled="{Binding CanShowInMods}" ToolTip="{Binding ShowInModsToolTip}" ToolTipService.ShowOnDisabled="True" />
+						<MenuItem Header="Rename..." Click="RenameSuit_Click" IsEnabled="{Binding CanRename}" ToolTip="{Binding RenameToolTip}" ToolTipService.ShowOnDisabled="True" />
+					</ContextMenu>
+				</Border.ContextMenu>
+				<Grid>
+					<TextBlock x:Name="InitialText" Text="{Binding Initial}" Foreground="#1D4655" FontFamily="Bahnschrift SemiBold Condensed, Segoe UI" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,30" />
+					<Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+
+					<Border VerticalAlignment="Bottom" Background="#C8030A10" Padding="3,2,3,3">
+						<TextBlock Text="{Binding Name}" Foreground="#F2F6F8" FontSize="10.5" TextWrapping="Wrap" TextAlignment="Center" MaxHeight="28" TextTrimming="CharacterEllipsis" />
+					</Border>
+
+					<Border HorizontalAlignment="Left" VerticalAlignment="Top" Background="#C8030A10" Padding="4,1,5,1" CornerRadius="0,0,3,0">
+						<TextBlock Text="{Binding Position}" Foreground="{Binding PositionBrush}" FontSize="10" FontWeight="Bold" />
+					</Border>
+
+					<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0">
+						<Border Background="#C8030A10" CornerRadius="2" Padding="2,1" Margin="2,0,0,0" Visibility="{Binding TiedVisibility}" ToolTip="Shares its SortIndex with another suit: its place can shift when mods change">
+							<TextBlock Text="TIE" FontSize="8.5" FontWeight="Bold" Foreground="#FFB000" />
+						</Border>
+						<Border Background="#C8030A10" CornerRadius="2" Padding="2,1" Margin="2,0,0,0" Visibility="{Binding LockVisibility}" ToolTip="{Binding LockToolTip}">
+							<TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#C9D6DC" />
+						</Border>
+						<Border Background="#C8030A10" CornerRadius="2" Padding="3,0,3,1" Margin="2,0,0,0" Visibility="{Binding ModVisibility}" ToolTip="Added by a mod">
+							<TextBlock Text="MOD" FontSize="8.5" FontWeight="Bold" Foreground="#3FD8E8" />
+						</Border>
+					</StackPanel>
+				</Grid>
+			</Border>
+			<DataTemplate.Triggers>
+				<!-- Batmobiles: landscape tiles, one per row like the in-game list (see BatmobilesPanel) -->
+				<DataTrigger Binding="{Binding IsWide}" Value="True">
+					<Setter TargetName="Cell" Property="Width" Value="320" />
+					<Setter TargetName="Cell" Property="Height" Value="148" />
+					<Setter TargetName="InitialText" Property="Margin" Value="0,0,0,20" />
+				</DataTrigger>
+			</DataTemplate.Triggers>
+		</DataTemplate>
+	</UserControl.Resources>
+
+	<Border BorderThickness="0,1,0,0" BorderBrush="#0E3646" Margin="-2,-1,-2,-2">
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition />
+				<ColumnDefinition Width="300" />
+			</Grid.ColumnDefinitions>
+
+			<!-- the Showcase grid -->
+			<Grid Grid.Column="0" Background="#03121A">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+
+				<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="16,10,16,8">
+					<RadioButton x:Name="PagePlayersButton" Style="{StaticResource PageTab}" GroupName="ShowcasePage" IsChecked="True" Checked="PageButton_Checked" Content="SUITS" />
+					<RadioButton x:Name="PageBatmobilesButton" Style="{StaticResource PageTab}" GroupName="ShowcasePage" Checked="PageButton_Checked" Content="BATMOBILES" />
+				</StackPanel>
+
+				<ItemsControl Grid.Row="1" x:Name="CharacterChips" Margin="16,0,16,4">
+					<ItemsControl.ItemsPanel>
+						<ItemsPanelTemplate>
+							<WrapPanel />
+						</ItemsPanelTemplate>
+					</ItemsControl.ItemsPanel>
+					<ItemsControl.ItemTemplate>
+						<DataTemplate DataType="{x:Type local:CharacterChip}">
+							<RadioButton Style="{StaticResource CharacterChip}" GroupName="ShowcaseCharacter" IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="CharacterChip_Checked" Content="{Binding Label}" />
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<ListBox Grid.Row="2" x:Name="SuitsGrid" Background="Transparent" BorderThickness="0" Padding="8,0,8,8"
+						 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+						 SelectionMode="Extended" ItemContainerStyle="{StaticResource SuitCellContainer}" ItemTemplate="{StaticResource SuitCellTemplate}"
+						 AllowDrop="True" PreviewMouseLeftButtonDown="SuitsGrid_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="SuitsGrid_PreviewMouseLeftButtonUp" PreviewMouseMove="SuitsGrid_PreviewMouseMove"
+						 DragOver="SuitsGrid_DragOver" DragLeave="SuitsGrid_DragLeave" Drop="SuitsGrid_Drop" SelectionChanged="SuitsGrid_SelectionChanged" PreviewKeyDown="SuitsGrid_PreviewKeyDown">
+					<ListBox.ItemsPanel>
+						<!-- swapped for BatmobilesPanel on the Batmobiles page -->
+						<StaticResource ResourceKey="SuitsPanel" />
+					</ListBox.ItemsPanel>
+				</ListBox>
+
+				<TextBlock Grid.Row="2" x:Name="GridMessage" Visibility="Collapsed" IsHitTestVisible="False" Foreground="#7FA3B3" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="30" />
+
+				<Border Grid.Row="3" x:Name="GridHintBar" Background="#061C26" Padding="16,6,16,7" Visibility="Collapsed">
+					<Grid>
+						<TextBlock x:Name="GridHint" Foreground="#7FA3B3" TextWrapping="Wrap" Margin="0,0,150,0" VerticalAlignment="Center" />
+						<Button x:Name="FixTiesButton" Content="Pin this order" HorizontalAlignment="Right" VerticalAlignment="Center" Width="140" Height="22" Visibility="Collapsed" Click="FixTiesButton_Click"
+								ToolTip="Give every suit its own SortIndex, so the game always shows them in the order you see here" />
+					</Grid>
+				</Border>
+			</Grid>
+
+			<!-- details and saving -->
+			<Grid Grid.Column="1" Background="{DynamicResource PanelBrush}">
+				<Grid.RowDefinitions>
+					<RowDefinition />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+
+				<ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+					<Grid Margin="10,8,10,8">
+						<TextBlock x:Name="NoSelectionLabel" Style="{StaticResource Hint}" Text="Select a suit to see its details." />
+
+						<StackPanel x:Name="DetailsPanel" Visibility="Collapsed">
+							<TextBlock x:Name="SuitNameLabel" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" />
+							<TextBlock x:Name="SuitCharacterLabel" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,1,0,0" />
+							<TextBlock x:Name="SuitDescriptionLabel" Foreground="{DynamicResource SubtleTextBrush}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="70" />
+									<ColumnDefinition />
+								</Grid.ColumnDefinitions>
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+								</Grid.RowDefinitions>
+								<TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Foreground="{DynamicResource FaintTextBrush}" />
+								<TextBlock Grid.Row="0" Grid.Column="1" x:Name="SuitPositionLabel" TextWrapping="Wrap" />
+								<TextBlock Grid.Row="1" Grid.Column="0" Text="Item" Foreground="{DynamicResource FaintTextBrush}" Margin="0,3,0,0" />
+								<TextBlock Grid.Row="1" Grid.Column="1" x:Name="SuitItemLabel" TextWrapping="Wrap" Margin="0,3,0,0" />
+								<TextBlock Grid.Row="2" Grid.Column="0" Text="Skin" Foreground="{DynamicResource FaintTextBrush}" Margin="0,3,0,0" />
+								<TextBlock Grid.Row="2" Grid.Column="1" x:Name="SuitSkinLabel" TextWrapping="Wrap" Margin="0,3,0,0" />
+								<TextBlock Grid.Row="3" Grid.Column="0" Text="From" Foreground="{DynamicResource FaintTextBrush}" Margin="0,3,0,0" />
+								<TextBlock Grid.Row="3" Grid.Column="1" x:Name="SuitSourceLabel" TextWrapping="Wrap" Margin="0,3,0,0" />
+							</Grid>
+
+							<TextBlock x:Name="SuitNotesLabel" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+							<TextBlock x:Name="SelectionCountLabel" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,8,0,0" />
+							<StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+								<Button Content="To top" Width="64" Height="22" Click="MoveTop_Click" ToolTip="Move to the start (of this character's suits, when a character is selected above)" />
+								<Button Content="Up" Width="46" Height="22" Margin="4,0,0,0" Click="MoveUp_Click" ToolTip="Move one place back (Ctrl+Left)" />
+								<Button Content="Down" Width="54" Height="22" Margin="4,0,0,0" Click="MoveDown_Click" ToolTip="Move one place forward (Ctrl+Right)" />
+								<Button Content="To bottom" Width="84" Height="22" Margin="4,0,0,0" Click="MoveBottom_Click" ToolTip="Move to the end (of this character's suits, when a character is selected above)" />
+							</StackPanel>
+						</StackPanel>
+					</Grid>
+				</ScrollViewer>
+
+				<StackPanel Grid.Row="1" Margin="8,0,8,6">
+					<Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}" Margin="0,0,0,6" />
+					<TextBlock Text="Suit profiles" FontWeight="SemiBold" Margin="1,0,0,4" />
+					<ComboBox x:Name="PresetsComboBox" Height="22" SelectionChanged="PresetsComboBox_SelectionChanged">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Name}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+					<StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+						<Button x:Name="LoadPresetButton" Content="Load" Width="70" Height="22" Click="LoadPreset_Click" ToolTip="Put this profile's order in the grid (then Save to write it to the game)" />
+						<Button Content="Save as..." Width="80" Height="22" Margin="4,0,0,0" Click="SavePresetAs_Click" ToolTip="Save the order in the grid as a suit profile" />
+						<Button x:Name="DeletePresetButton" Content="Delete" Width="70" Height="22" Margin="4,0,0,0" Click="DeletePreset_Click" />
+					</StackPanel>
+
+					<Border x:Name="StateSeparator" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource BorderBrush}" Margin="0,8,0,6" />
+
+					<Grid x:Name="NotModifiedPanel">
+						<TextBlock x:Name="OrderStateLabel" Text="" VerticalAlignment="Center" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap" Margin="1,0,0,0" />
+					</Grid>
+
+					<Grid x:Name="ModifiedPanel" Visibility="Collapsed">
+						<TextBlock Text="There are unsaved changes!" FontWeight="Bold" VerticalAlignment="Center" Margin="1,0,0,0" />
+						<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+							<Button Content="Undo" Width="55" Height="22" Click="UndoButton_Click" />
+							<Button Content="Save" Style="{StaticResource AccentButton}" Width="55" Height="22" Margin="6,0,0,0" Click="SaveButton_Click" ToolTip="Write this order into the game files" />
+						</StackPanel>
+					</Grid>
+				</StackPanel>
+			</Grid>
+		</Grid>
+	</Border>
+</UserControl>

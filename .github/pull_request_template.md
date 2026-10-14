@@ -1,5 +1,5 @@
 <!--
-    Thank you for contributing to Overstrike.
+    Thank you for contributing to Overstrike-BAK.
     Please read the following carefully before creating submitting your Pull Request.
 
     Make sure your changes follow the Code Style / Commit Guidelines before you submit.

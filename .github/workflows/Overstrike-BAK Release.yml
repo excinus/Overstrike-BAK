@@ -1,0 +1,57 @@
+name: "Overstrike-BAK Release"
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CSPROJ: OverstrikeBAK/OverstrikeBAK.csproj
+  PUBLISH_DIR: publish/
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish the project
+        run: dotnet publish ${{ env.CSPROJ }} -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ${{ env.PUBLISH_DIR }}
+
+      - name: Add LICENSE.txt and README.txt
+        shell: bash
+        run: |
+          cp LICENSE.txt "${{ env.PUBLISH_DIR }}"
+          cp OverstrikeBAK/README.txt "${{ env.PUBLISH_DIR }}"
+
+      - name: Generate names by tag
+        id: names
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "release_name=Overstrike-BAK ${tag}" >> $GITHUB_OUTPUT
+          echo "archive_name=Overstrike-BAK_${tag}.zip" >> $GITHUB_OUTPUT
+
+      - name: Zip the files
+        uses: thedoctor0/zip-release@0.7.5
+        with:
+          type: "zip"
+          filename: ${{ steps.names.outputs.archive_name }}
+          directory: ${{ env.PUBLISH_DIR }}
+          exclusions: "*.pdb"
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          name: ${{ steps.names.outputs.release_name }}
+          body: ""
+          artifacts: "${{ env.PUBLISH_DIR }}${{ steps.names.outputs.archive_name }}"
