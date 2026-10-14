@@ -27,24 +27,24 @@ jobs:
       - name: Publish the project
         run: dotnet publish ${{ env.CSPROJ }} -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ${{ env.PUBLISH_DIR }}
 
-      - name: Add LICENSE.txt and README.txt
+      - name: Add LICENSE and README
         shell: bash
         run: |
-          cp LICENSE.txt "${{ env.PUBLISH_DIR }}"
-          cp OverstrikeBAK/README.txt "${{ env.PUBLISH_DIR }}"
+          cp LICENSE.txt "${{ env.PUBLISH_DIR }}/LICENSE.txt"
+          cp README.md "${{ env.PUBLISH_DIR }}/README.md"
 
       - name: Generate names by tag
         id: names
         shell: bash
         run: |
           tag="${GITHUB_REF#refs/tags/}"
-          echo "release_name=Overstrike-BAK ${tag}" >> $GITHUB_OUTPUT
-          echo "archive_name=Overstrike-BAK_${tag}.zip" >> $GITHUB_OUTPUT
+          echo "release_name=Overstrike-BAK ${tag}" >> "$GITHUB_OUTPUT"
+          echo "archive_name=Overstrike-BAK_${tag}.zip" >> "$GITHUB_OUTPUT"
 
       - name: Zip the files
         uses: thedoctor0/zip-release@0.7.5
         with:
-          type: "zip"
+          type: zip
           filename: ${{ steps.names.outputs.archive_name }}
           directory: ${{ env.PUBLISH_DIR }}
           exclusions: "*.pdb"
