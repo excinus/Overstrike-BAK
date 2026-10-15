@@ -54,6 +54,7 @@ namespace OverstrikeBAK.Mods {
 
 	internal static class Nexus {
 		public const string GameDomain = "batmanarkhamknight";
+		public const int AppModId = 3570; // Overstrike-BAK's own page
 		private const string GraphQlUrl = "https://api.nexusmods.com/v2/graphql";
 
 		public static string GetModUrl(int modId) => $"https://www.nexusmods.com/{GameDomain}/mods/{modId}";

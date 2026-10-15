@@ -165,14 +165,14 @@
 											</ContextMenu>
 										</Grid.ContextMenu>
 										<Grid.ColumnDefinitions>
-											<ColumnDefinition Width="78" />
+											<ColumnDefinition Width="92" />
 											<ColumnDefinition />
 											<ColumnDefinition Width="Auto" />
 										</Grid.ColumnDefinitions>
 
 										<CheckBox Grid.Column="0" IsChecked="{Binding Install}" HorizontalAlignment="Left" Margin="7,0,0,0" VerticalAlignment="Center" />
 
-										<Border Grid.Column="0" Background="{Binding BadgeColor}" CornerRadius="2" Width="44" Height="15" Margin="29,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center">
+										<Border Grid.Column="0" Background="{Binding BadgeColor}" CornerRadius="2" Width="58" Height="15" Margin="29,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center">
 											<TextBlock Text="{Binding BadgeText}" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
 										</Border>
 
@@ -235,6 +235,10 @@
 								<StackPanel Style="{StaticResource SettingRow}">
 									<TextBlock Text="Theme" Style="{StaticResource SettingLabel}" />
 									<ComboBox x:Name="Settings_Theme" Width="160" Height="24" SelectionChanged="Settings_Theme_SelectionChanged" />
+								</StackPanel>
+								<StackPanel Style="{StaticResource SettingRow}">
+									<CheckBox x:Name="Settings_DeleteArchives" Content="Delete archives after adding them" VerticalAlignment="Center" Checked="Settings_DeleteArchives_Changed" Unchecked="Settings_DeleteArchives_Changed"
+											  ToolTip="Once a mod is in the Mods Library, the .zip, .7z or .rar it came from is deleted (from Downloads, for example), so it isn't on disk twice" />
 								</StackPanel>
 							</StackPanel>
 						</Expander>

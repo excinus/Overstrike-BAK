@@ -19,23 +19,44 @@ namespace OverstrikeBAK.Mods {
 		public string Name;
 		public string Description;
 		public string ShowcaseName; // DLC mods: the in-game name of the one item it adds ("" = none, or several items)
+		public List<string> Files = new(); // files for the game folder itself (a replacer's, a script mod's extras), relative to it
+		public string FilesRoot = "";      // where they are: the folder that stands for the game folder
 	}
 
 	public class DetectionResult {
 		public List<DetectedMod> Mods = new();
 		public List<string> TfcInstallerFiles = new();
 		public bool IsTfcInstallerMod => TfcInstallerFiles.Count > 0;
+		public List<string> ResoRepFiles = new();
+		public bool IsResoRepMod => ResoRepFiles.Count > 0;
 	}
 
 	/// <summary>
 	/// Finds mods inside a folder (an extracted archive, a Mods Library entry, a DLC folder...):
 	/// - DLC: a folder with Config\ and/or CookedPCConsole\ (optionally under BmGame\), the same layout as the
 	///   game's own DLC\&lt;number&gt;\Content. It goes to DLC\&lt;number&gt;\&lt;folder&gt;.
-	/// - BmSDK script mod: a folder with mod.toml. It goes to BmGame\Mods\&lt;folder&gt;.
+	/// - BmSDK script mod: a folder with mod.toml. It goes to BmGame\Mods\&lt;folder&gt;. Files next to it for the game folder
+	///   (in a copy of the game's layout, like Binaries\Console.txt next to BmGame\Mods\&lt;folder&gt;) go there too.
+	/// - Loose BmSDK scripts: BmGame\Scripts\*.cs in a game layout (ModsLibrary lays out archives that only have .cs
+	///   files this way). They go to BmGame\Scripts. They count as script mods.
+	/// - Replacer: a folder laid out like the game folder (BmGame\CookedPCConsole, and/or DLC\&lt;number&gt;\Content for
+	///   "hybrid" ones) that doesn't register a DLC. Its files go in place of the game's own.
 	/// - TFC Installer mod: *.upk.PackagePatch / *.TFCMapping files, or .tfc files outside any DLC. Not supported.
+	/// - ResoRep mod: nothing but loose .dds textures (read by ResoRep while the game runs). Not supported.
 	/// </summary>
 	internal static class ModDetector {
 		private static readonly Regex DlcPathSegment = new(@"(^|\\)DLC\\\d+\\", RegexOptions.IgnoreCase);
+
+		/// <summary>A readme, a preview picture...: comes with mods but isn't part of them.</summary>
+		public static bool IsDocument(string file) => DocumentExtensions.Contains(Path.GetExtension(file));
+
+		/// <summary>Top folders of the game folder a replacer can put files in.</summary>
+		private static readonly HashSet<string> GameTopFolders = new(StringComparer.OrdinalIgnoreCase) { "BmGame", "DLC", "Engine", "Binaries" };
+
+		/// <summary>Files that come with mods but aren't part of them (readmes, previews...).</summary>
+		private static readonly HashSet<string> DocumentExtensions = new(StringComparer.OrdinalIgnoreCase) {
+			".txt", ".md", ".rtf", ".pdf", ".nfo", ".url", ".html", ".htm", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+		};
 
 		public static DetectionResult Detect(string folder, string folderName) {
 			var result = new DetectionResult();
@@ -77,11 +98,80 @@ namespace OverstrikeBAK.Mods {
 				});
 			}
 
+			string Child(string dir, string name) => dir.Length > 0 ? dir + "\\" + name : name;
+
+			// loose scripts: BmGame\Scripts\*.cs (and nothing for CookedPCConsole: that's a replacer)
+			var looseRoots = new List<string>();
+			foreach (var (dir, subdirs) in children) {
+				if (scriptRoots.Any(s => IsInsideRelative(dir, s) || IsInsideRelative(s, dir))) continue;
+				if (!subdirs.Contains("BmGame") || !children.TryGetValue(Child(dir, "BmGame"), out var bm) || !bm.Contains("Scripts") || bm.Contains("CookedPCConsole")) continue;
+				var scriptsDir = Child(Child(dir, "BmGame"), "Scripts");
+				if (!files.Any(f => IsInsideRelative(Path.GetDirectoryName(f) ?? "", scriptsDir) && f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))) continue;
+				looseRoots.Add(dir);
+			}
+			foreach (var root in RemoveNested(looseRoots)) {
+				var gameFiles = files
+					.Where(f => IsInsideRelative(Path.GetDirectoryName(f) ?? "", root))
+					.Select(f => root.Length > 0 ? f.Substring(root.Length + 1) : f)
+					.Where(f => f.Contains('\\') && GameTopFolders.Contains(f.Split('\\')[0]))
+					.ToList();
+				var scripts = gameFiles.Where(f => f.StartsWith("BmGame\\Scripts\\", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName).ToList();
+				result.Mods.Add(new DetectedMod() {
+					RelativeRoot = root,
+					Type = ModType.SCRIPT,
+					Name = root.Length > 0 ? Path.GetFileName(root) : folderName,
+					Description = "BmSDK scripts: " + string.Join(", ", scripts.Take(4)) + (scripts.Count > 4 ? $" (and {scripts.Count - 4} more)" : ""),
+					Files = gameFiles,
+					FilesRoot = root,
+				});
+				scriptRoots.Add(root); // not a replacer or DLC mod too
+			}
+
+			// replacers: the game's own layout, BmGame\CookedPCConsole and/or DLC\<number>\Content (official DLC files)
+			var replacerCandidates = new List<string>();
+			foreach (var (dir, subdirs) in children) {
+				if (scriptRoots.Any(s => IsInsideRelative(dir, s) || IsInsideRelative(s, dir))) continue; // a script mod's game layout isn't a replacer
+
+				var bmGame = Child(dir, "BmGame");
+				var hasCooked = subdirs.Contains("BmGame") && children.TryGetValue(bmGame, out var bm) && bm.Contains("CookedPCConsole");
+				var dlc = Child(dir, "DLC");
+				var hasOfficialDlc = subdirs.Contains("DLC") && children.TryGetValue(dlc, out var numbers)
+					&& numbers.Any(n => n.All(char.IsDigit) && children.TryGetValue(Child(dlc, n), out var inside) && inside.Contains("Content"));
+				if (!hasCooked && !hasOfficialDlc) continue;
+
+				// a DLC mod in a BmGame folder (Config\BmGame.ini registering it) isn't a replacer
+				var registers = files.Any(f => IsInsideRelative(Path.GetDirectoryName(f) ?? "", bmGame) && f.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) && LooksLikeDlcConfig(Path.Combine(folder, f)));
+				if (registers && !hasOfficialDlc) continue;
+
+				replacerCandidates.Add(dir);
+			}
+
+			var replacerRoots = RemoveNested(replacerCandidates);
+			foreach (var root in replacerRoots) {
+				var gameFiles = files
+					.Where(f => IsInsideRelative(Path.GetDirectoryName(f) ?? "", root))
+					.Select(f => root.Length > 0 ? f.Substring(root.Length + 1) : f)
+					.Where(f => f.Contains('\\') && GameTopFolders.Contains(f.Split('\\')[0])) // readmes next to BmGame\ stay out
+					.ToList();
+				if (gameFiles.Count == 0) continue;
+
+				var tops = gameFiles.Select(f => f.Split('\\')[0]).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase);
+				result.Mods.Add(new DetectedMod() {
+					RelativeRoot = root,
+					Type = ModType.REPLACER,
+					Name = root.Length > 0 ? Path.GetFileName(root) : folderName,
+					Description = $"Replaces {gameFiles.Count} game file{(gameFiles.Count == 1 ? "" : "s")} (in {string.Join(", ", tops)})",
+					Files = gameFiles,
+					FilesRoot = root,
+				});
+			}
+
 			// DLC
 			var candidates = new List<string>();
 			foreach (var (dir, subdirs) in children) {
 				if (!subdirs.Contains("CookedPCConsole") && !subdirs.Contains("Config")) continue;
 				if (scriptRoots.Any(s => IsInsideRelative(dir, s))) continue;
+				if (replacerRoots.Any(r => IsInsideRelative(dir, r))) continue;
 
 				var candidate = dir;
 				if (Path.GetFileName(dir).Equals("BmGame", StringComparison.OrdinalIgnoreCase)) {
@@ -108,13 +198,37 @@ namespace OverstrikeBAK.Mods {
 				});
 			}
 
+			// script mods' extra files: in BmGame\Mods\<mod>'s game layout (or next to the mod's folder), the files of the
+			// game's top folders (Binaries\Console.txt...) that aren't part of any mod found above
+			var modRoots = result.Mods.Select(m => m.RelativeRoot).ToList();
+			foreach (var script in result.Mods.Where(m => m.Type == ModType.SCRIPT && !looseRoots.Contains(m.RelativeRoot))) {
+				var m = Regex.Match(script.RelativeRoot, @"^(?:(.*)\\)?BmGame\\Mods\\[^\\]+$", RegexOptions.IgnoreCase);
+				var gameRoot = m.Success ? m.Groups[1].Value : (Path.GetDirectoryName(script.RelativeRoot) ?? "");
+				if (gameRoot.Equals(script.RelativeRoot, StringComparison.OrdinalIgnoreCase)) continue;
+
+				script.FilesRoot = gameRoot;
+				script.Files = files
+					.Where(f => IsInsideRelative(Path.GetDirectoryName(f) ?? "", gameRoot))
+					.Where(f => !modRoots.Any(r => r.Length > 0 && IsInsideRelative(Path.GetDirectoryName(f) ?? "", r)))
+					.Select(f => gameRoot.Length > 0 ? f.Substring(gameRoot.Length + 1) : f)
+					.Where(f => f.Contains('\\') && GameTopFolders.Contains(f.Split('\\')[0]) && !f.StartsWith("BmGame\\Mods\\", StringComparison.OrdinalIgnoreCase))
+					.ToList();
+			}
+
 			// TFC Installer
 			foreach (var file in files) {
 				var name = Path.GetFileName(file);
 				var isTfcInstallerFile = name.EndsWith(".PackagePatch", StringComparison.OrdinalIgnoreCase)
 					|| name.EndsWith(".TFCMapping", StringComparison.OrdinalIgnoreCase)
-					|| (name.EndsWith(".tfc", StringComparison.OrdinalIgnoreCase) && !dlcRoots.Any(r => IsInsideRelative(Path.GetDirectoryName(file) ?? "", r)));
+					|| (name.EndsWith(".tfc", StringComparison.OrdinalIgnoreCase) && !dlcRoots.Concat(replacerRoots).Any(r => IsInsideRelative(Path.GetDirectoryName(file) ?? "", r)));
 				if (isTfcInstallerFile) result.TfcInstallerFiles.Add(file);
+			}
+
+			// ResoRep: only loose textures (and maybe a readme or preview pictures)
+			if (result.Mods.Count == 0 && !result.IsTfcInstallerMod) {
+				var textures = files.Where(f => f.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList();
+				var others = files.Where(f => !f.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) && !DocumentExtensions.Contains(Path.GetExtension(f))).ToList();
+				if (textures.Count > 0 && others.Count == 0) result.ResoRepFiles = textures;
 			}
 
 			return result;

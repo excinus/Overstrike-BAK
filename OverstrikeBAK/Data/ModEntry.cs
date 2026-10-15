@@ -7,11 +7,13 @@ using OverstrikeBAK.Mods;
 using OverstrikeBAK.Utils;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 
 namespace OverstrikeBAK.Data {
 	public enum ModType {
 		DLC,            // DLC\<number>\<ModFolder>: add-on skins for Batman, the Batmobile and the other characters
+		REPLACER,       // files laid out like the game's (BmGame\CookedPCConsole, DLC\<number>\Content...): replace the game's own
 		SCRIPT,         // BmGame\Mods\<ModFolder>: BmSDK script mods (folder with mod.toml)
 		TFC_INSTALLER,  // .upk.PackagePatch / .TFCMapping / loose .tfc: not supported, installed with TFC Installer
 	}
@@ -32,6 +34,15 @@ namespace OverstrikeBAK.Data {
 		public string LocalName { get; set; }
 		public string FolderName { get; set; }   // folder name in the game
 		public string Description { get; set; }
+		// files it puts in the game folder itself (relative to it): a replacer's files, or the extra files of a script
+		// mod (like Binaries\Console.txt). The game's own are kept aside while it's installed.
+		public List<string> GameFiles { get; set; } = new();
+		// where those files are inside its library folder while it's not installed ("" = the library folder itself)
+		public string GameFilesRoot { get; set; } = "";
+
+		/// <summary>All it has are files for the game folder itself (a replacer, loose BmGame\Scripts\*.cs scripts): no mod folder to move.</summary>
+		public bool OnlyGameFiles => Type == ModType.REPLACER
+			|| (GameFiles.Count > 0 && string.Equals(FileUtils.NormalizeRelative(GameFilesRoot), PathInEntry, System.StringComparison.OrdinalIgnoreCase));
 		// DLC mods adding one item: its name in the Suits Menu
 		private string _showcaseName;
 		public string ShowcaseName {
@@ -160,6 +171,8 @@ namespace OverstrikeBAK.Data {
 				}
 				if (!string.IsNullOrEmpty(Description)) lines.Add(Description);
 				if (Type == ModType.TFC_INSTALLER) lines.Add("TFC Installer mod: install it manually with TFC Installer.");
+				if (Type == ModType.REPLACER) lines.Add("Replacer: puts its files in place of the game's own, which are kept aside until it's removed.");
+				if (Type != ModType.REPLACER && GameFiles.Count > 0) lines.Add((OnlyGameFiles ? "Puts in the game folder: " : "Also puts in the game folder: ") + string.Join(", ", GameFiles.Take(3)) + (GameFiles.Count > 3 ? $" (and {GameFiles.Count - 3} more)" : ""));
 				lines.Add("Mods Library/" + Path);
 				return string.Join("\n", lines);
 			}
@@ -167,12 +180,14 @@ namespace OverstrikeBAK.Data {
 
 		public string BadgeText => Type switch {
 			ModType.DLC => "DLC",
+			ModType.REPLACER => "REPLACER",
 			ModType.SCRIPT => "SDK",
 			_ => "TFC",
 		};
 
 		public string BadgeColor => Type switch {
 			ModType.DLC => "#1E6FB8",
+			ModType.REPLACER => "#2E9E4F",
 			ModType.SCRIPT => "#D98200",
 			_ => "#77838C",
 		};

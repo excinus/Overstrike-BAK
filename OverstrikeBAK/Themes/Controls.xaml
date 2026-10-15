@@ -31,6 +31,7 @@
 
 	<!-- buttons -->
 	<Style TargetType="{x:Type Button}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
 		<Setter Property="Background" Value="{DynamicResource ButtonBrush}" />
 		<Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
@@ -94,6 +95,7 @@
 
 	<!-- flat icon button (+, refresh) -->
 	<Style x:Key="IconButton" TargetType="{x:Type Button}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
 		<Setter Property="Background" Value="Transparent" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -287,6 +289,7 @@
 	</Style>
 
 	<Style TargetType="{x:Type ComboBox}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
 		<Setter Property="Template">
@@ -316,6 +319,7 @@
 	</Style>
 
 	<Style TargetType="{x:Type ComboBoxItem}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
 		<Setter Property="Template">
 			<Setter.Value>
@@ -347,6 +351,7 @@
 	<Style TargetType="{x:Type utils:ListViewEx}" BasedOn="{StaticResource {x:Type ListView}}" />
 
 	<Style x:Key="ListItem" TargetType="{x:Type ListViewItem}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
 		<Setter Property="HorizontalContentAlignment" Value="Stretch" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -393,6 +398,7 @@
 	</Style>
 
 	<Style TargetType="{x:Type GridViewColumnHeader}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}" />
 		<Setter Property="HorizontalContentAlignment" Value="Left" />
 		<Setter Property="Template">
@@ -433,11 +439,11 @@
 	<Style TargetType="{x:Type TabItem}">
 		<Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}" />
 		<Setter Property="FocusVisualStyle" Value="{x:Null}" />
-		<Setter Property="Cursor" Value="Hand" />
+		<!-- the hand only on the header: a TabItem's cursor also applies to its page -->
 		<Setter Property="Template">
 			<Setter.Value>
 				<ControlTemplate TargetType="{x:Type TabItem}">
-					<Border x:Name="Bd" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="14,7,14,6">
+					<Border x:Name="Bd" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="14,7,14,6" Cursor="Hand">
 						<ContentPresenter ContentSource="Header" TextElement.FontFamily="Bahnschrift SemiBold Condensed, Segoe UI" TextElement.FontSize="15" />
 					</Border>
 					<ControlTemplate.Triggers>
@@ -520,6 +526,7 @@
 	</Style>
 
 	<Style TargetType="{x:Type MenuItem}">
+		<Setter Property="Cursor" Value="Hand" />
 		<Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
 		<Setter Property="Template">
 			<Setter.Value>

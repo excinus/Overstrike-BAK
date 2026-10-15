@@ -81,6 +81,27 @@ namespace OverstrikeBAK {
 			}
 
 			RefreshNexusInfo();
+			await CheckForAppUpdate();
+		}
+
+		/// <summary>
+		/// Asks to download a newer Overstrike-BAK when its Nexus Mods page has one: opens the page's Files tab and
+		/// closes, so the exe can be replaced. Quietly does nothing when offline.
+		/// </summary>
+		private async Task CheckForAppUpdate() {
+			NexusInfo info;
+			try {
+				info = await Nexus.Fetch(Nexus.AppModId);
+			} catch {
+				return;
+			}
+			if (!Nexus.IsNewer(info.Version, App.Version)) return;
+
+			var latest = info.Version.TrimStart('v', 'V');
+			if (!Dialog.Confirm($"Overstrike-BAK v{latest} is available (you have v{App.Version}).\n\nDownload it now? Its Nexus Mods page opens, and Overstrike-BAK closes so you can replace the exe.", "Download", "Not now", "Update available")) return;
+
+			Dialog.OpenUrl(Nexus.GetModUrl(Nexus.AppModId) + "?tab=files");
+			Close();
 		}
 
 		#region ISuitsHost
@@ -308,10 +329,15 @@ namespace OverstrikeBAK {
 					(mod.Status, mod.StatusKind) = ("Will be removed", "pending");
 				} else if (here && !Directory.Exists(Path.Combine(GamePath, mod.InstalledPath))) {
 					(mod.Status, mod.StatusKind) = ("Missing from the game folder", "problem");
+				} else if (here && mod.Type == ModType.REPLACER) {
+					(mod.Status, mod.StatusKind) = (mod.GameFiles.Count == 1 ? "1 game file replaced" : $"{mod.GameFiles.Count} game files replaced", "");
+				} else if (here && mod.OnlyGameFiles) {
+					(mod.Status, mod.StatusKind) = ((mod.GameFiles.Count == 1 ? mod.GameFiles[0] : $"{mod.GameFiles.Count} files in BmGame\\Scripts") + (bmSdkInstalled ? "" : " · BmSDK not installed"), bmSdkInstalled ? "" : "problem");
 				} else if (here && mod.Type == ModType.SCRIPT && !bmSdkInstalled) {
 					(mod.Status, mod.StatusKind) = (mod.InstalledPath.Replace('/', '\\') + " · BmSDK not installed", "problem");
 				} else if (here) {
-					(mod.Status, mod.StatusKind) = (mod.InstalledPath.Replace('/', '\\'), "");
+					var extra = mod.GameFiles.Count == 0 ? "" : mod.GameFiles.Count == 1 ? " · +" + mod.GameFiles[0] : $" · +{mod.GameFiles.Count} game files";
+					(mod.Status, mod.StatusKind) = (mod.InstalledPath.Replace('/', '\\') + extra, "");
 				} else {
 					(mod.Status, mod.StatusKind) = ("", "");
 				}
@@ -347,12 +373,57 @@ namespace OverstrikeBAK {
 			var tfc = affected.Where(m => !m.IsSupported && m.Install).ToList();
 			var elsewhere = affected.Where(m => m.Install && m.InstalledGame != null && !m.IsInstalledIn(GamePath)).ToList();
 			foreach (var mod in tfc.Concat(elsewhere)) mod.Install = false;
+
+			// two mods can't both put their file in place of the same game file (replacers, script mods' extras): one has to go
+			foreach (var mod in affected.Where(m => m.Install && m.GameFiles.Count > 0)) {
+				foreach (var other in _modsList.Where(o => o != mod && o.Install && o.GameFiles.Count > 0).ToList()) {
+					if (!mod.Install) break;
+					var shared = SharedGameFiles(mod, other);
+					if (shared.Count == 0) continue;
+
+					var keep = Dialog.Show($"{mod.Name} and {other.Name} both put these files in the game folder:\n\n{DescribeFiles(shared)}\n\nOnly one of them can be installed.",
+						"Mods conflict", DialogIcon.Warning, $"Install {ShortName(mod.Name)}", $"Install {ShortName(other.Name)}");
+					if (keep == 0) other.Install = false;
+					else mod.Install = false;
+				}
+			}
 			_propagatingInstallChange = false;
 
 			UpdateModStatuses();
 
 			if (tfc.Count > 0) ShowTfcInstallerMessage(tfc.Select(m => m.Name));
 			if (elsewhere.Count > 0) Dialog.Warning($"{elsewhere[0].Name} is installed in another game folder:\n{elsewhere[0].InstalledGame}");
+		}
+
+		/// <summary>The files both mods put in the game folder itself (replacers, script mods' extras).</summary>
+		private static List<string> SharedGameFiles(ModEntry a, ModEntry b) {
+			if (a == b || a.GameFiles.Count == 0 || b.GameFiles.Count == 0) return new List<string>();
+			var files = new HashSet<string>(a.GameFiles, StringComparer.OrdinalIgnoreCase);
+			return b.GameFiles.Where(files.Contains).ToList();
+		}
+
+		private static string DescribeFiles(List<string> files) {
+			var shown = string.Join("\n", files.Take(6));
+			return files.Count > 6 ? $"{shown}\n(and {files.Count - 6} more)" : shown;
+		}
+
+		private static string ShortName(string name) => name.Length > 32 ? name.Substring(0, 30).TrimEnd() + "…" : name;
+
+		/// <summary>The first pair of ticked mods that put the same files in the game folder, if any.</summary>
+		private (ModEntry, ModEntry, List<string>)? FindGameFilesConflict() {
+			var ticked = _modsList.Where(m => m.Install && m.GameFiles.Count > 0 && CanTick(m)).ToList();
+			for (var i = 0; i < ticked.Count; ++i) {
+				for (var j = i + 1; j < ticked.Count; ++j) {
+					var shared = SharedGameFiles(ticked[i], ticked[j]);
+					if (shared.Count > 0) return (ticked[i], ticked[j], shared);
+				}
+			}
+			return null;
+		}
+
+		private static void ShowResoRepMessage(IEnumerable<string> names) {
+			var list = string.Join("\n", names);
+			Dialog.Warning($"{list}\n\nThis is a ResoRep mod (loose textures). Install it manually with ResoRep.", "ResoRep mod");
 		}
 
 		private static void ShowTfcInstallerMessage(IEnumerable<string> names) {
@@ -425,13 +496,23 @@ namespace OverstrikeBAK {
 			var check = !visible.Any(m => m.Install);
 
 			_propagatingInstallChange = true;
+			var skipped = new List<ModEntry>();
 			foreach (var mod in visible) {
-				mod.Install = check && CanTick(mod);
+				var tick = check && CanTick(mod);
+				if (tick && mod.GameFiles.Count > 0 && _modsList.Any(o => o.Install && SharedGameFiles(mod, o).Count > 0)) {
+					tick = false;
+					skipped.Add(mod);
+				}
+				mod.Install = tick;
 			}
 			_propagatingInstallChange = false;
 
 			UpdateModStatuses();
 			ResortIfByChecked();
+			if (skipped.Count > 0) {
+				ShowStatusMessage(skipped.Count == 1 ? $"{skipped[0].Name} wasn't ticked: it puts the same files in the game folder as another ticked mod."
+					: $"{skipped.Count} mods weren't ticked: they put the same files in the game folder as other ticked mods.");
+			}
 		}
 
 		/// <summary>The sort modes: arrow up is the first way, arrow down (choosing it again) the other.</summary>
@@ -627,6 +708,11 @@ namespace OverstrikeBAK {
 			var suitOrder = IsSuitOrderPending();
 			if (toInstall.Count == 0 && toRemove.Count == 0 && !suitOrder) return true;
 
+			if (FindGameFilesConflict() is var (a, b, shared)) {
+				Dialog.Error($"{a.Name} and {b.Name} both put these files in the game folder:\n\n{DescribeFiles(shared)}\n\nUntick one of them.", "Mods conflict");
+				return false;
+			}
+
 			if (GameInstall.IsRunning() && !Dialog.Confirm("The game is running, so its files may be locked.", "Apply anyway", "Cancel", icon: DialogIcon.Warning)) {
 				return false;
 			}
@@ -796,18 +882,40 @@ namespace OverstrikeBAK {
 				},
 			};
 
+			var deleteArchives = _settings.DeleteArchivesAfterAdding;
+			var deleted = 0;
+			var notDeleted = new List<string>();
 			await RunTask("Adding mods...", progress => {
 				foreach (var source in sources) {
-					ModsLibrary.Add(source, result, name => progress($"Adding {name}..."));
+					var added = ModsLibrary.Add(source, result, name => progress($"Adding {name}..."));
+
+					// the archive isn't needed anymore: the mod is in the library (the setting is off by default)
+					if (added && deleteArchives && File.Exists(source) && ModsLibrary.IsArchive(source) && !FileUtils.IsInside(source, ModsLibrary.LibraryPath)) {
+						try {
+							File.SetAttributes(source, FileAttributes.Normal);
+							File.Delete(source);
+							++deleted;
+						} catch (Exception ex) {
+							notDeleted.Add($"{Path.GetFileName(source)}: {ex.Message}");
+						}
+					}
 				}
 			});
+
+			if (notDeleted.Count > 0) {
+				Dialog.Warning("Added, but couldn't delete:\n" + string.Join("\n", notDeleted));
+			}
 
 			if (result.TfcInstallerMods.Count > 0) {
 				ShowTfcInstallerMessage(result.TfcInstallerMods);
 			}
 
+			if (result.ResoRepMods.Count > 0) {
+				ShowResoRepMessage(result.ResoRepMods);
+			}
+
 			if (result.Unsupported.Count > 0) {
-				Dialog.Warning("No DLC or script mod found in:\n" + string.Join("\n", result.Unsupported));
+				Dialog.Warning("No DLC, replacer or script mod found in:\n" + string.Join("\n", result.Unsupported));
 			}
 
 			if (result.Errors.Count > 0) {
@@ -854,6 +962,7 @@ namespace OverstrikeBAK {
 			var parts = new List<string>();
 			if (result.AddedFolders.Count > 0) parts.Add($"{result.AddedFolders.Count} mod{(result.AddedFolders.Count == 1 ? "" : "s")} added (tick and Apply to install)");
 			if (result.ReplacedFolders.Count > 0) parts.Add($"{result.ReplacedFolders.Count} updated");
+			if (deleted > 0) parts.Add(deleted == 1 ? "1 archive deleted" : $"{deleted} archives deleted");
 			ShowStatusMessage(string.Join(", ", parts) + ".");
 			RefreshNexusInfo();
 		}
@@ -914,7 +1023,10 @@ namespace OverstrikeBAK {
 		private void OpenModFolder_Click(object sender, RoutedEventArgs e) {
 			if (((FrameworkElement)sender).DataContext is not ModEntry mod) return;
 
-			if (mod.InstalledGame != null) {
+			if (mod.InstalledGame != null && mod.OnlyGameFiles) {
+				var first = mod.GameFiles.Select(f => Path.GetDirectoryName(Path.Combine(mod.InstalledGame, f))).FirstOrDefault(Directory.Exists);
+				OpenFolder(first ?? mod.InstalledGame);
+			} else if (mod.InstalledGame != null) {
 				var folder = Path.Combine(mod.InstalledGame, mod.InstalledPath.Replace('/', '\\'));
 				OpenFolder(Directory.Exists(folder) ? folder : mod.InstalledGame);
 			} else {
@@ -1110,6 +1222,7 @@ namespace OverstrikeBAK {
 			var profile = _selectedProfile;
 			Settings_Theme.ItemsSource = new[] { Theme.Dark, Theme.Light };
 			Settings_Theme.SelectedItem = Theme.Current;
+			Settings_DeleteArchives.IsChecked = _settings.DeleteArchivesAfterAdding;
 
 			Settings_GamePath.Text = profile.GamePath;
 			Settings_Store.Text = GameInstall.GetStore(profile.GamePath) switch {
@@ -1134,6 +1247,12 @@ namespace OverstrikeBAK {
 			if (!_reactToSettingsChanges || Settings_Theme.SelectedItem is not string theme) return;
 			Theme.Apply(theme);
 			_settings.Theme = theme;
+			((App)Application.Current).WriteSettings();
+		}
+
+		private void Settings_DeleteArchives_Changed(object sender, RoutedEventArgs e) {
+			if (!_reactToSettingsChanges) return;
+			_settings.DeleteArchivesAfterAdding = Settings_DeleteArchives.IsChecked == true;
 			((App)Application.Current).WriteSettings();
 		}
 

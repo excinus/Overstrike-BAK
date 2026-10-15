@@ -16,10 +16,11 @@ namespace OverstrikeBAK {
 	public partial class App: Application {
 		public static string BaseDirectory => AppContext.BaseDirectory.TrimEnd('\\', '/');
 
+		/// <summary>"1.1": versions have two numbers, like on Nexus Mods.</summary>
 		public static string Version {
 			get {
 				var v = Assembly.GetExecutingAssembly().GetName().Version;
-				return v == null ? "?" : $"{v.Major}.{v.Minor}.{v.Build}";
+				return v == null ? "?" : $"{v.Major}.{v.Minor}";
 			}
 		}
 

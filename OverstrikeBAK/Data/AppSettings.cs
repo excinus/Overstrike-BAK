@@ -12,6 +12,7 @@ namespace OverstrikeBAK.Data {
 		public string Theme = Utils.Theme.Dark;
 		public string ModsSort = ModsSortName; // how the Mods list is sorted
 		public bool ModsSortReversed = false;  // the arrow down: Z-A, oldest first, unchecked first, SDK mods first
+		public bool DeleteArchivesAfterAdding = false; // an added .zip/.7z/.rar is deleted once its mod is in the library
 
 		public const string ModsSortName = "name";
 		public const string ModsSortAdded = "added";
@@ -26,6 +27,7 @@ namespace OverstrikeBAK.Data {
 			Theme = (string)json["theme"] ?? Theme;
 			ModsSort = (string)json["mods_sort"] ?? ModsSort;
 			ModsSortReversed = (bool?)json["mods_sort_reversed"] ?? ModsSortReversed;
+			DeleteArchivesAfterAdding = (bool?)json["delete_archives_after_adding"] ?? DeleteArchivesAfterAdding;
 		}
 
 		public void Save(string file) {
@@ -34,6 +36,7 @@ namespace OverstrikeBAK.Data {
 				["theme"] = Theme,
 				["mods_sort"] = ModsSort,
 				["mods_sort_reversed"] = ModsSortReversed,
+				["delete_archives_after_adding"] = DeleteArchivesAfterAdding,
 			};
 			File.WriteAllText(file, j.ToString());
 		}

@@ -18,8 +18,13 @@ namespace OverstrikeBAK.Mods {
 	/// BmGame\Mods\&lt;folder&gt;). A mod's files are only ever in one of the two places; its library folder keeps
 	/// overstrike-bak.json so it can be found and moved back. Moving within a drive is instant; across drives the
 	/// files are copied, then deleted.
+	/// Replacers (and script mods' extra files, like Binaries\Console.txt) put each of their files in place of the game's
+	/// own; the game's file is moved to "Overstrike-BAK Backups\&lt;mod&gt;" inside the game folder (same drive, so it's
+	/// instant) and moved back when the mod is removed.
 	/// </summary>
 	internal class Deployer {
+		public const string ReplacerBackupsFolder = "Overstrike-BAK Backups";
+
 		private readonly string _gamePath;
 
 		public Deployer(string gamePath) {
@@ -42,6 +47,19 @@ namespace OverstrikeBAK.Mods {
 			var source = ModsLibrary.GetModFolder(mod);
 			if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"'{mod.Name}' is missing from the Mods Library.");
 
+			if (mod.OnlyGameFiles) {
+				if (mod.GameFiles.Count == 0) throw new InvalidOperationException($"'{mod.Name}' has no game files to put in place.");
+				var backupRoot = PutGameFiles(mod, ModsLibrary.GetGameFilesFolder(mod), onFile);
+				mod.InstalledGame = _gamePath;
+				mod.InstalledPath = FileUtils.NormalizeRelative(Path.GetRelativePath(_gamePath, backupRoot));
+				ModsLibrary.UpdateManifest(mod);
+				return;
+			}
+
+			// a script mod's extra files first: they're put back if anything fails
+			var extras = mod.GameFiles.Count > 0;
+			if (extras) PutGameFiles(mod, ModsLibrary.GetGameFilesFolder(mod), onFile);
+
 			string target;
 			if (installedPath != null && !Directory.Exists(Path.Combine(_gamePath, installedPath.Replace('/', '\\')))) {
 				target = Path.Combine(_gamePath, installedPath.Replace('/', '\\'));
@@ -52,7 +70,12 @@ namespace OverstrikeBAK.Mods {
 				target = FileUtils.MakeUniquePath(parent, FileUtils.SanitizeFileName(mod.FolderName));
 			}
 
-			MoveContents(source, target, deleteSource: mod.PathInEntry.Length > 0, onFile);
+			try {
+				MoveContents(source, target, deleteSource: mod.PathInEntry.Length > 0, onFile);
+			} catch {
+				if (extras) TakeGameFiles(mod, ModsLibrary.GetGameFilesFolder(mod));
+				throw;
+			}
 			if (mod.PathInEntry.Length > 0) RemoveEmptyLibraryFolders(source, ModsLibrary.GetEntryFolder(mod.Entry));
 
 			mod.InstalledGame = _gamePath;
@@ -64,16 +87,20 @@ namespace OverstrikeBAK.Mods {
 		public void Uninstall(ModEntry mod, Action<string> onFile = null) {
 			if (!mod.IsInstalledIn(_gamePath)) return;
 
-			var installed = Path.Combine(_gamePath, mod.InstalledPath.Replace('/', '\\'));
-			if (Directory.Exists(installed)) {
-				if (!IsSafeToMove(installed)) throw new InvalidOperationException($"'{installed}' isn't a mod folder.");
+			if (!mod.OnlyGameFiles) {
+				var installed = Path.Combine(_gamePath, mod.InstalledPath.Replace('/', '\\'));
+				if (Directory.Exists(installed)) {
+					if (!IsSafeToMove(installed)) throw new InvalidOperationException($"'{installed}' isn't a mod folder.");
 
-				// the Suits Menu may have rewritten SortIndex values in its configs: the library keeps the originals
-				new SuitBackups(_gamePath).RestoreInside(installed);
+					// the Suits Menu may have rewritten SortIndex values in its configs: the library keeps the originals
+					new SuitBackups(_gamePath).RestoreInside(installed);
 
-				MoveContents(installed, ModsLibrary.GetModFolder(mod), deleteSource: true, onFile);
-				RemoveEmptyParents(installed);
+					MoveContents(installed, ModsLibrary.GetModFolder(mod), deleteSource: true, onFile);
+					RemoveEmptyParents(installed);
+				}
 			}
+
+			if (mod.GameFiles.Count > 0) TakeGameFiles(mod, ModsLibrary.GetGameFilesFolder(mod), onFile);
 
 			mod.InstalledGame = null;
 			mod.InstalledPath = null;
@@ -84,16 +111,20 @@ namespace OverstrikeBAK.Mods {
 		public void Delete(ModEntry mod) {
 			if (!mod.IsInstalledIn(_gamePath)) return;
 
-			var installed = Path.Combine(_gamePath, mod.InstalledPath.Replace('/', '\\'));
-			if (Directory.Exists(installed)) {
-				if (!IsSafeToMove(installed)) throw new InvalidOperationException($"'{installed}' isn't a mod folder.");
+			if (!mod.OnlyGameFiles) {
+				var installed = Path.Combine(_gamePath, mod.InstalledPath.Replace('/', '\\'));
+				if (Directory.Exists(installed)) {
+					if (!IsSafeToMove(installed)) throw new InvalidOperationException($"'{installed}' isn't a mod folder.");
 
-				var backups = new SuitBackups(_gamePath).GetBackupPath(installed);
-				if (Directory.Exists(backups)) FileUtils.DeleteDirectory(backups);
+					var backups = new SuitBackups(_gamePath).GetBackupPath(installed);
+					if (Directory.Exists(backups)) FileUtils.DeleteDirectory(backups);
 
-				FileUtils.DeleteDirectory(installed);
-				RemoveEmptyParents(installed);
+					FileUtils.DeleteDirectory(installed);
+					RemoveEmptyParents(installed);
+				}
 			}
+
+			if (mod.GameFiles.Count > 0) TakeGameFiles(mod, null);
 
 			mod.InstalledGame = null;
 			mod.InstalledPath = null;
@@ -117,6 +148,133 @@ namespace OverstrikeBAK.Mods {
 				ModsLibrary.UpdateManifest(mod);
 			}
 		}
+
+		#region files in the game folder itself (replacers, script mods' extras)
+
+		private string GetBackupRoot(ModEntry mod) {
+			return Path.Combine(_gamePath, ReplacerBackupsFolder, FileUtils.SanitizeFileName(mod.Path.Replace('/', '_')));
+		}
+
+		/// <summary>
+		/// Moves the game's files aside and the mod's GameFiles (from 'source') in their place. If anything fails,
+		/// everything is put back. Returns the folder with the game's files.
+		/// </summary>
+		private string PutGameFiles(ModEntry mod, string source, Action<string> onFile) {
+			var files = mod.GameFiles;
+			var backupRoot = GetBackupRoot(mod);
+			if (FileUtils.EnumerateFilesSafe(backupRoot).Length > 0) {
+				throw new InvalidOperationException($"Original game files from an earlier install of '{mod.Name}' are still in {backupRoot}. Put them back in the game (or delete them, if the game is fine) first.");
+			}
+			Directory.CreateDirectory(backupRoot);
+
+			var done = new List<(string rel, bool backedUp)>();
+			try {
+				foreach (var rel in files) {
+					onFile?.Invoke(Path.GetFileName(rel));
+					var from = Path.Combine(source, rel);
+					var target = Path.Combine(_gamePath, rel);
+					var backup = Path.Combine(backupRoot, rel);
+					if (!File.Exists(from)) throw new FileNotFoundException($"{rel} is missing from the Mods Library.");
+
+					var backedUp = File.Exists(target);
+					if (backedUp) {
+						Directory.CreateDirectory(Path.GetDirectoryName(backup));
+						File.SetAttributes(target, FileAttributes.Normal);
+						File.Move(target, backup);
+					}
+
+					try {
+						Directory.CreateDirectory(Path.GetDirectoryName(target));
+						File.Move(from, target);
+					} catch {
+						if (backedUp) File.Move(backup, target);
+						throw;
+					}
+					done.Add((rel, backedUp));
+				}
+			} catch {
+				// back as it was: the mod's files in the library, the game's in the game
+				foreach (var (rel, backedUp) in Enumerable.Reverse(done)) {
+					try {
+						var target = Path.Combine(_gamePath, rel);
+						var from = Path.Combine(source, rel);
+						Directory.CreateDirectory(Path.GetDirectoryName(from));
+						File.Move(target, from, true);
+						if (backedUp) File.Move(Path.Combine(backupRoot, rel), target);
+						else RemoveEmptyGameFolders(Path.GetDirectoryName(target));
+					} catch {}
+				}
+				RemoveEmptyFolders(backupRoot, Path.Combine(_gamePath, ReplacerBackupsFolder), true);
+				throw;
+			}
+
+			RemoveEmptyFolders(source, ModsLibrary.GetEntryFolder(mod.Entry), false);
+			return backupRoot;
+		}
+
+		/// <summary>Takes the mod's GameFiles out of the game (into 'library', or deleted when null) and puts the game's own back.</summary>
+		private void TakeGameFiles(ModEntry mod, string library, Action<string> onFile = null) {
+			var backupRoot = GetBackupRoot(mod);
+
+			foreach (var rel in mod.GameFiles) {
+				onFile?.Invoke(Path.GetFileName(rel));
+				var target = Path.Combine(_gamePath, rel);
+				var backup = Path.Combine(backupRoot, rel);
+
+				if (File.Exists(target)) {
+					File.SetAttributes(target, FileAttributes.Normal);
+					if (library != null) {
+						var to = Path.Combine(library, rel);
+						Directory.CreateDirectory(Path.GetDirectoryName(to));
+						File.Move(target, to, true);
+					} else {
+						File.Delete(target);
+					}
+				}
+
+				if (File.Exists(backup)) {
+					File.Move(backup, target, true);
+				} else {
+					RemoveEmptyGameFolders(Path.GetDirectoryName(target)); // a file the mod added: its folders go too, if empty
+				}
+			}
+
+			RemoveEmptyFolders(backupRoot, Path.Combine(_gamePath, ReplacerBackupsFolder), true);
+		}
+
+		/// <summary>Removes empty folders inside 'folder' and 'folder' itself, then its empty parents up to 'stop' ('stop' too when 'removeStop').</summary>
+		private static void RemoveEmptyFolders(string folder, string stop, bool removeStop) {
+			try {
+				if (Directory.Exists(folder)) {
+					foreach (var dir in Directory.GetDirectories(folder, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length)) {
+						if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir);
+					}
+				}
+
+				var current = folder;
+				while (current != null && FileUtils.IsInside(current, stop)) {
+					if (FileUtils.SamePath(current, stop) && !removeStop) break;
+					if (!Directory.Exists(current) || Directory.EnumerateFileSystemEntries(current).Any()) break;
+					Directory.Delete(current);
+					if (FileUtils.SamePath(current, stop)) break;
+					current = Path.GetDirectoryName(current);
+				}
+			} catch {}
+		}
+
+		/// <summary>Removes 'folder' and its parents while they're empty, never the game folder itself.</summary>
+		private void RemoveEmptyGameFolders(string folder) {
+			try {
+				var current = folder;
+				while (current != null && FileUtils.IsInside(current, _gamePath) && !FileUtils.SamePath(current, _gamePath)) {
+					if (!Directory.Exists(current) || Directory.EnumerateFileSystemEntries(current).Any()) break;
+					Directory.Delete(current);
+					current = Path.GetDirectoryName(current);
+				}
+			} catch {}
+		}
+
+		#endregion
 
 		/// <summary>
 		/// Moves everything inside 'source' into 'target' (created if needed). The library's overstrike-bak.json never

@@ -20,6 +20,9 @@ namespace OverstrikeBAK.Mods {
 		public string Description;
 		public string ShowcaseName;     // DLC mods: the Suits Menu name of the one item it adds ("" = none or several; null = not read yet)
 
+		public List<string> Files;      // files it puts in the game folder itself (relative to it): a replacer's, a script mod's extras
+		public string FilesRoot;        // where they are inside the entry folder while not installed
+
 		public string InstalledGame;    // game folder it's installed in, or null if it's in the library
 		public string InstalledPath;    // relative to that game folder
 
@@ -60,6 +63,8 @@ namespace OverstrikeBAK.Mods {
 						Folder = (string)o["folder"],
 						Description = (string)o["description"],
 						ShowcaseName = (string)o["showcase_name"],
+						Files = (o["files"] as JArray)?.Select(x => (string)x).Where(x => !string.IsNullOrEmpty(x)).ToList(),
+						FilesRoot = (string)o["files_root"],
 					};
 
 					if (o["installed"] is JObject installed) {
@@ -89,6 +94,10 @@ namespace OverstrikeBAK.Mods {
 					["description"] = m.Description,
 					["showcase_name"] = m.ShowcaseName,
 				};
+				if (m.Files != null && m.Files.Count > 0) {
+					o["files"] = new JArray(m.Files);
+					o["files_root"] = m.FilesRoot ?? "";
+				}
 				if (m.IsInstalled) {
 					o["installed"] = new JObject() { ["game"] = m.InstalledGame, ["path"] = m.InstalledPath };
 				}

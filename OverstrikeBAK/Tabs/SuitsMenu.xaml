@@ -61,6 +61,7 @@
 
 		<!-- grid cells -->
 		<Style x:Key="SuitCellContainer" TargetType="{x:Type ListBoxItem}">
+			<Setter Property="Cursor" Value="Hand" />
 			<Setter Property="Margin" Value="3" />
 			<Setter Property="Padding" Value="0" />
 			<Setter Property="Template">
