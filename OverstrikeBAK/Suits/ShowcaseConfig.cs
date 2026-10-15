@@ -103,6 +103,7 @@ namespace OverstrikeBAK.Suits {
 		public ConfigSource Source;
 		public int Order; // position in load order (across all sources)
 		public ConfigOp Op;
+		public bool Hidden; // commented out by "Hide": the game doesn't read it
 		public string RawValue;
 		public ShowcaseFields Fields;
 	}
@@ -112,13 +113,22 @@ namespace OverstrikeBAK.Suits {
 		public const string Section = "BmGame.RGameInfo";
 		public const string Key = "ShowcaseItems";
 
+		/// <summary>
+		/// "Hide" comments a line out with this in front, so the game skips it and it can be put back as it was.
+		/// </summary>
+		public const string HiddenTag = ";[Hidden by Overstrike-BAK]";
+
 		private static readonly Regex SortIndexRegex = new(@"(SortIndex\s*=\s*)(-?\d+)", RegexOptions.IgnoreCase);
 
+		/// <summary>The line commented out by "Hide".</summary>
+		public static string Hide(string line) => HiddenTag + " " + line.TrimStart();
+
 		/// <summary>
-		/// Calls 'onLine(op, value, fields, line)' for every ShowcaseItems line. It can return a new text for that line
-		/// (or null to keep it). Returns the new file text, or null if nothing changed.
+		/// Calls 'onLine(op, value, fields, line, hidden)' for every ShowcaseItems line ('line' without the HiddenTag of
+		/// a hidden one). It can return a new text for that line (or null to keep it). Returns the new file text, or null
+		/// if nothing changed.
 		/// </summary>
-		public static string Process(string text, Func<ConfigOp, string, ShowcaseFields, string, string> onLine) {
+		public static string Process(string text, Func<ConfigOp, string, ShowcaseFields, string, bool, string> onLine) {
 			var lines = text.Split('\n');
 			var section = "";
 			var changed = false;
@@ -126,6 +136,8 @@ namespace OverstrikeBAK.Suits {
 			for (var i = 0; i < lines.Length; ++i) {
 				var raw = lines[i];
 				var line = raw.TrimEnd('\r').Trim();
+				var hidden = line.StartsWith(HiddenTag, StringComparison.OrdinalIgnoreCase);
+				if (hidden) line = line.Substring(HiddenTag.Length).Trim();
 				if (line.Length == 0 || line.StartsWith(";")) continue;
 
 				if (line.StartsWith("[") && line.EndsWith("]")) {
@@ -150,7 +162,7 @@ namespace OverstrikeBAK.Suits {
 
 				var value = body.Substring(eq + 1).Trim();
 				var original = raw.TrimEnd('\r');
-				var replacement = onLine(op, value, ShowcaseFields.Parse(value), original);
+				var replacement = onLine(op, value, ShowcaseFields.Parse(value), hidden ? line : original, hidden);
 				if (replacement != null && replacement != original) {
 					lines[i] = replacement + (raw.EndsWith("\r") ? "\r" : "");
 					changed = true;
@@ -165,10 +177,10 @@ namespace OverstrikeBAK.Suits {
 			return SortIndexRegex.Replace(line, m => m.Groups[1].Value + sortIndex, 1);
 		}
 
-		public static List<(ConfigOp, string, ShowcaseFields)> Read(string text) {
-			var result = new List<(ConfigOp, string, ShowcaseFields)>();
-			Process(text, (op, value, fields, line) => {
-				result.Add((op, value, fields));
+		public static List<(ConfigOp op, string value, ShowcaseFields fields, bool hidden)> Read(string text) {
+			var result = new List<(ConfigOp, string, ShowcaseFields, bool)>();
+			Process(text, (op, value, fields, line, hidden) => {
+				result.Add((op, value, fields, hidden));
 				return null;
 			});
 			return result;

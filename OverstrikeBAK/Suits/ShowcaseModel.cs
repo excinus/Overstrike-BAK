@@ -46,6 +46,7 @@ namespace OverstrikeBAK.Suits {
 		public List<string> NameFiles = new(); // the mods' GFxUI files (inside DLC\, not official DLC) that name it
 		public int Appearances = 1;   // >1: the same item shows up several times in game (same Item, different SortIndex)
 		public bool Tied;             // shares its SortIndex with another item: their order depends on the order mod folders are loaded
+		public bool Hidden;           // all its lines are commented out by "Hide": the game doesn't show it
 		public string ThumbnailPackage;
 	}
 
@@ -92,9 +93,10 @@ namespace OverstrikeBAK.Suits {
 					continue;
 				}
 
-				foreach (var (op, value, fields) in ShowcaseIni.Read(text)) {
-					var line = new ShowcaseLine() { Source = source, Order = order++, Op = op, RawValue = value, Fields = fields };
+				foreach (var (op, value, fields, hidden) in ShowcaseIni.Read(text)) {
+					var line = new ShowcaseLine() { Source = source, Order = order++, Op = op, Hidden = hidden, RawValue = value, Fields = fields };
 					allLines.Add(line);
+					if (hidden) continue; // commented out: the game doesn't read it
 
 					switch (op) {
 						case ConfigOp.Add:
@@ -224,8 +226,13 @@ namespace OverstrikeBAK.Suits {
 		}
 
 		private static List<ShowcaseSuit> MakePage(string page, List<ShowcaseLine> effective, List<ShowcaseLine> allLines, Dictionary<string, string> strings, Dictionary<string, string> thumbnails) {
-			var entries = effective
-				.Where(e => e.Fields.Page.Equals(page, StringComparison.OrdinalIgnoreCase))
+			// hidden items (every line commented out) are listed where they'd be, so they can be shown again
+			var onPage = effective.Where(e => e.Fields.Page.Equals(page, StringComparison.OrdinalIgnoreCase)).ToList();
+			var shownItems = new HashSet<string>(onPage.Select(e => e.Fields.Item));
+			var hiddenLines = allLines.Where(l => l.Hidden && l.Op != ConfigOp.Remove && l.Op != ConfigOp.Clear)
+				.Where(l => l.Fields.Page.Equals(page, StringComparison.OrdinalIgnoreCase) && !shownItems.Contains(l.Fields.Item));
+
+			var entries = onPage.Concat(hiddenLines)
 				.OrderBy(e => e.Fields.SortIndex ?? 0)
 				.ThenBy(e => e.Fields.Unlocked ? 0 : 1)
 				.ThenBy(e => e.Order)
@@ -233,7 +240,7 @@ namespace OverstrikeBAK.Suits {
 
 			// which SortIndex values are shared by different items
 			var itemsPerIndex = new Dictionary<int, HashSet<string>>();
-			foreach (var e in entries) {
+			foreach (var e in entries.Where(e => !e.Hidden)) {
 				var index = e.Fields.SortIndex ?? 0;
 				if (!itemsPerIndex.TryGetValue(index, out var set)) {
 					set = new HashSet<string>();
@@ -248,11 +255,13 @@ namespace OverstrikeBAK.Suits {
 
 			foreach (var e in entries) {
 				var item = e.Fields.Item;
-				if (item == previous) continue; // same check as XI_BatCaveEnumerate (case-sensitive)
-				previous = item;
+				if (!e.Hidden) {
+					if (item == previous) continue; // same check as XI_BatCaveEnumerate (case-sensitive)
+					previous = item;
+				}
 
 				if (byItem.TryGetValue(item, out var existing)) {
-					++existing.Appearances;
+					if (!e.Hidden) ++existing.Appearances;
 					continue;
 				}
 
@@ -276,7 +285,8 @@ namespace OverstrikeBAK.Suits {
 					WBPlay = e.Fields.WBPlay,
 					Condition = e.Fields.Condition,
 					SourceLabel = e.Source.Label,
-					Tied = itemsPerIndex[sortIndex].Count > 1,
+					Tied = !e.Hidden && itemsPerIndex[sortIndex].Count > 1,
+					Hidden = e.Hidden,
 					ThumbnailPackage = thumbnails.TryGetValue(item, out var package) ? package : null,
 				};
 

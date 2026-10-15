@@ -15,6 +15,7 @@ namespace OverstrikeBAK.Suits {
 	/// </summary>
 	public class SuitOrder {
 		public Dictionary<string, List<string>> Pages = new(System.StringComparer.OrdinalIgnoreCase);
+		public Dictionary<string, List<string>> Hidden = null; // items hidden on each page (null: not saved, older files)
 
 		public List<string> Get(string page) {
 			return Pages.TryGetValue(page, out var list) ? list : null;
@@ -25,6 +26,18 @@ namespace OverstrikeBAK.Suits {
 			foreach (var (page, items) in Pages) {
 				result.Pages[page] = new List<string>(items);
 			}
+			if (Hidden != null) {
+				result.Hidden = new(System.StringComparer.OrdinalIgnoreCase);
+				foreach (var (page, items) in Hidden) result.Hidden[page] = new List<string>(items);
+			}
+			return result;
+		}
+
+		/// <summary>The hidden items as sets, for SuitOrderWriter (null if not saved).</summary>
+		public Dictionary<string, HashSet<string>> HiddenSets() {
+			if (Hidden == null) return null;
+			var result = new Dictionary<string, HashSet<string>>(System.StringComparer.OrdinalIgnoreCase);
+			foreach (var (page, items) in Hidden) result[page] = new HashSet<string>(items);
 			return result;
 		}
 
@@ -33,7 +46,13 @@ namespace OverstrikeBAK.Suits {
 			foreach (var (page, items) in Pages) {
 				pages[page] = new JArray(items);
 			}
-			return new JObject() { ["pages"] = pages };
+			var json = new JObject() { ["pages"] = pages };
+			if (Hidden != null) {
+				var hidden = new JObject();
+				foreach (var (page, items) in Hidden) hidden[page] = new JArray(items);
+				json["hidden"] = hidden;
+			}
+			return json;
 		}
 
 		public static SuitOrder FromJson(JObject json) {
@@ -43,6 +62,12 @@ namespace OverstrikeBAK.Suits {
 					if (items is JArray array) {
 						result.Pages[page] = array.Select(x => (string)x).Where(x => !string.IsNullOrEmpty(x)).ToList();
 					}
+				}
+			}
+			if (json["hidden"] is JObject hidden) {
+				result.Hidden = new(System.StringComparer.OrdinalIgnoreCase);
+				foreach (var (page, items) in hidden) {
+					if (items is JArray array) result.Hidden[page] = array.Select(x => (string)x).Where(x => !string.IsNullOrEmpty(x)).ToList();
 				}
 			}
 			return result;

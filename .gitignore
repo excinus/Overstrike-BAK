@@ -7,6 +7,19 @@
 #*.dll
 #*.exe
 
+# only these are committed at the top level (anything else there, like publish/, stays local)
+/*
+!/.github/
+!/OverstrikeBAK/
+!/.gitattributes
+!/.gitignore
+!/LICENSE.txt
+!/Overstrike-BAK.sln
+!/README.md
+
+# the readme lives at the top level only
+/OverstrikeBAK/README.txt
+
 # User-specific files
 *.rsuser
 *.suo

@@ -32,6 +32,7 @@ namespace OverstrikeBAK {
 
 		protected override void OnStartup(StartupEventArgs e) {
 			Directory.SetCurrentDirectory(BaseDirectory);
+			Utils.ContextMenuPlacement.Enable();
 
 			// two instances would both copy, delete and rewrite the same game files
 			_singleInstance = new System.Threading.Mutex(true, "OverstrikeBAK_" + BaseDirectory.ToLowerInvariant().Replace('\\', '_').Replace(':', '_'), out var isFirst);

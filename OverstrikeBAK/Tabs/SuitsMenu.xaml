@@ -99,9 +99,10 @@
 					<ContextMenu>
 						<MenuItem Header="Show in Mods list" Click="ShowInModsList_Click" IsEnabled="{Binding CanShowInMods}" ToolTip="{Binding ShowInModsToolTip}" ToolTipService.ShowOnDisabled="True" />
 						<MenuItem Header="Rename..." Click="RenameSuit_Click" IsEnabled="{Binding CanRename}" ToolTip="{Binding RenameToolTip}" ToolTipService.ShowOnDisabled="True" />
+						<MenuItem Header="{Binding HideHeader}" Click="HideSuit_Click" ToolTip="{Binding HideToolTip}" />
 					</ContextMenu>
 				</Border.ContextMenu>
-				<Grid>
+				<Grid x:Name="CellContent">
 					<TextBlock x:Name="InitialText" Text="{Binding Initial}" Foreground="#1D4655" FontFamily="Bahnschrift SemiBold Condensed, Segoe UI" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,30" />
 					<Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
 
@@ -110,7 +111,7 @@
 					</Border>
 
 					<Border HorizontalAlignment="Left" VerticalAlignment="Top" Background="#C8030A10" Padding="4,1,5,1" CornerRadius="0,0,3,0">
-						<TextBlock Text="{Binding Position}" Foreground="{Binding PositionBrush}" FontSize="10" FontWeight="Bold" />
+						<TextBlock Text="{Binding PositionText}" Foreground="{Binding PositionBrush}" FontSize="10" FontWeight="Bold" />
 					</Border>
 
 					<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0">
@@ -132,6 +133,10 @@
 					<Setter TargetName="Cell" Property="Width" Value="320" />
 					<Setter TargetName="Cell" Property="Height" Value="148" />
 					<Setter TargetName="InitialText" Property="Margin" Value="0,0,0,20" />
+				</DataTrigger>
+				<!-- hidden in game: dimmed -->
+				<DataTrigger Binding="{Binding Hidden}" Value="True">
+					<Setter TargetName="CellContent" Property="Opacity" Value="0.35" />
 				</DataTrigger>
 			</DataTemplate.Triggers>
 		</DataTemplate>
@@ -172,7 +177,7 @@
 				</ItemsControl>
 
 				<ListBox Grid.Row="2" x:Name="SuitsGrid" Background="Transparent" BorderThickness="0" Padding="8,0,8,8"
-						 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+						 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.CanContentScroll="False"
 						 SelectionMode="Extended" ItemContainerStyle="{StaticResource SuitCellContainer}" ItemTemplate="{StaticResource SuitCellTemplate}"
 						 AllowDrop="True" PreviewMouseLeftButtonDown="SuitsGrid_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="SuitsGrid_PreviewMouseLeftButtonUp" PreviewMouseMove="SuitsGrid_PreviewMouseMove"
 						 DragOver="SuitsGrid_DragOver" DragLeave="SuitsGrid_DragLeave" Drop="SuitsGrid_Drop" SelectionChanged="SuitsGrid_SelectionChanged" PreviewKeyDown="SuitsGrid_PreviewKeyDown">

@@ -54,10 +54,10 @@ namespace OverstrikeBAK.Tabs {
 		public string Name => Suit.Name;
 		public string Initial => string.IsNullOrEmpty(Suit.CharacterName) ? "?" : Suit.CharacterName.Substring(0, 1);
 
-		public string ToolTip => $"{Suit.Name}\n{Suit.CharacterName} · {Suit.Item}\nFrom: {Suit.SourceLabel}";
+		public string ToolTip => $"{Suit.Name}\n{Suit.CharacterName} · {Suit.Item}\nFrom: {Suit.SourceLabel}" + (_hidden ? "\nHidden in game" : "");
 
 		public Visibility LockVisibility => (!Suit.Unlocked || Suit.WBPlay) ? Visibility.Visible : Visibility.Collapsed;
-		public string LockToolTip => Suit.WBPlay ? "Needs a WB Play unlock" : "Unlocked by playing the game";
+		public string LockToolTip => Suit.WBPlay ? "Locked via WB Play" : "Unlocked by playing the game";
 		public Visibility ModVisibility => IsFromMod ? Visibility.Visible : Visibility.Collapsed;
 		public Visibility TiedVisibility => Suit.Tied ? Visibility.Visible : Visibility.Collapsed;
 
@@ -66,6 +66,21 @@ namespace OverstrikeBAK.Tabs {
 		public string ShowInModsToolTip => CanShowInMods ? null : Suit.IsOfficial ? "It's part of the game" : "Its mod wasn't installed with Overstrike-BAK (Import from game adds it)";
 		public bool CanRename => !Suit.IsOfficial && Suit.NameFiles.Count > 0;
 		public string RenameToolTip => CanRename ? null : Suit.IsOfficial ? "It's part of the game" : "Its mod has no name file (GFxUI.int) to change";
+		public string HideHeader => _hidden ? "Unhide" : "Hide";
+		public string HideToolTip => _hidden ? "Show it in game again (then Save)" : "Keep its files, but don't show it in game (then Save)";
+
+		private bool _hidden;
+		/// <summary>Hidden in game (in the grid as it will be saved).</summary>
+		public bool Hidden {
+			get => _hidden;
+			set {
+				if (_hidden == value) return;
+				_hidden = value;
+				foreach (var name in new[] { nameof(Hidden), nameof(HideHeader), nameof(HideToolTip), nameof(ToolTip), nameof(PositionText) }) {
+					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+				}
+			}
+		}
 
 		/// <summary>Batmobile thumbnails are landscape (484x224), suits are portrait.</summary>
 		public bool IsWide => string.Equals(Suit.Page, ShowcaseModel.PageBatmobiles, StringComparison.OrdinalIgnoreCase);
@@ -80,8 +95,12 @@ namespace OverstrikeBAK.Tabs {
 				if (_position == value) return;
 				_position = value;
 				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Position)));
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PositionText)));
 			}
 		}
+
+		/// <summary>Its place in game (hidden suits don't count), or HIDDEN.</summary>
+		public string PositionText => _hidden ? "HIDDEN" : _position.ToString();
 
 		private bool _moved;
 		public bool Moved {
@@ -146,6 +165,8 @@ namespace OverstrikeBAK.Tabs {
 
 		private Dictionary<string, List<string>> _savedOrder = new(StringComparer.OrdinalIgnoreCase);
 		private Dictionary<string, List<string>> _order = new(StringComparer.OrdinalIgnoreCase);
+		private Dictionary<string, HashSet<string>> _savedHidden = new(StringComparer.OrdinalIgnoreCase); // hidden in game now
+		private Dictionary<string, HashSet<string>> _hidden = new(StringComparer.OrdinalIgnoreCase);      // hidden in the grid
 		private readonly HashSet<string> _forcedPages = new(StringComparer.OrdinalIgnoreCase); // "Pin this order" without moving anything
 		private bool _pendingRestoreOriginal = false;
 
@@ -258,17 +279,21 @@ namespace OverstrikeBAK.Tabs {
 			var hadChanges = HasChanges;
 			_model = model;
 			_savedOrder = new(StringComparer.OrdinalIgnoreCase);
+			_savedHidden = new(StringComparer.OrdinalIgnoreCase);
 			foreach (var page in ShowcaseModel.Pages) {
 				_savedOrder[page] = model.GetPage(page).Select(s => s.Item).ToList();
+				_savedHidden[page] = new HashSet<string>(model.GetPage(page).Where(s => s.Hidden).Select(s => s.Item));
 			}
 
 			if (hadChanges) {
 				// keep the user's unsaved edits, fitted to what's installed now
 				foreach (var page in ShowcaseModel.Pages) {
 					_order[page] = _order.TryGetValue(page, out var edited) ? Merge(page, edited) : new List<string>(_savedOrder[page]);
+					_hidden[page] = _hidden.TryGetValue(page, out var hidden) ? new HashSet<string>(hidden.Where(_savedOrder[page].Contains)) : new HashSet<string>(_savedHidden[page]);
 				}
 			} else {
 				_order = CloneOrder(_savedOrder);
+				_hidden = CloneHidden(_savedHidden);
 				_pendingRestoreOriginal = false;
 				_forcedPages.Clear();
 			}
@@ -342,6 +367,28 @@ namespace OverstrikeBAK.Tabs {
 			return result;
 		}
 
+		private static Dictionary<string, HashSet<string>> CloneHidden(Dictionary<string, HashSet<string>> hidden) {
+			var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+			foreach (var (page, items) in hidden) result[page] = new HashSet<string>(items);
+			return result;
+		}
+
+		private HashSet<string> HiddenOn(string page) {
+			if (!_hidden.TryGetValue(page, out var set)) _hidden[page] = set = new HashSet<string>();
+			return set;
+		}
+
+		/// <summary>Place in game (1-based, hidden items don't count; 0 if hidden).</summary>
+		private static int GamePosition(List<string> order, HashSet<string> hidden, string item) {
+			if (hidden.Contains(item)) return 0;
+			var position = 0;
+			foreach (var x in order) {
+				if (!hidden.Contains(x)) ++position;
+				if (x == item) return position;
+			}
+			return 0;
+		}
+
 		private List<string> Merge(string page, IReadOnlyList<string> wanted) {
 			var current = _savedOrder.TryGetValue(page, out var saved) ? saved : new List<string>();
 			var characters = new Dictionary<string, string>();
@@ -349,11 +396,18 @@ namespace OverstrikeBAK.Tabs {
 			return SuitOrder.Merge(current, wanted, item => characters.TryGetValue(item, out var c) ? c : "");
 		}
 
-		private bool PageChanged(string page) {
+		private bool OrderChanged(string page) {
 			if (_forcedPages.Contains(page)) return true;
 			if (!_order.TryGetValue(page, out var order) || !_savedOrder.TryGetValue(page, out var saved)) return false;
 			return !order.SequenceEqual(saved);
 		}
+
+		private bool HiddenChanged(string page) {
+			var saved = _savedHidden.TryGetValue(page, out var s) ? s : new HashSet<string>();
+			return !HiddenOn(page).SetEquals(saved);
+		}
+
+		private bool PageChanged(string page) => OrderChanged(page) || HiddenChanged(page);
 
 		public bool HasChanges => _model != null && (_pendingRestoreOriginal || ShowcaseModel.Pages.Any(PageChanged));
 
@@ -399,10 +453,14 @@ namespace OverstrikeBAK.Tabs {
 			var views = _views.TryGetValue(_page, out var v) ? v : new Dictionary<string, SuitView>();
 			var saved = _savedOrder.TryGetValue(_page, out var s) ? s : new List<string>();
 			var full = FullOrder;
+			var hidden = HiddenOn(_page);
 
+			var position = 0;
 			for (var i = 0; i < full.Count; ++i) {
 				if (!views.TryGetValue(full[i], out var view)) continue;
-				view.Position = i + 1;
+				view.Hidden = hidden.Contains(full[i]);
+				if (!view.Hidden) ++position;
+				view.Position = position;
 				view.Moved = _pendingRestoreOriginal || saved.IndexOf(full[i]) != i;
 			}
 
@@ -421,9 +479,9 @@ namespace OverstrikeBAK.Tabs {
 			}
 
 			var ties = views.Values.Count(x => x.Suit.Tied);
-			FixTiesButton.Visibility = (ties > 0 && !PageChanged(_page) && !_pendingRestoreOriginal) ? Visibility.Visible : Visibility.Collapsed;
+			FixTiesButton.Visibility = (ties > 0 && !OrderChanged(_page) && !_pendingRestoreOriginal) ? Visibility.Visible : Visibility.Collapsed;
 			// the bar under the grid only shows up for suits that share a SortIndex
-			GridHint.Text = (ties > 0 && !PageChanged(_page))
+			GridHint.Text = (ties > 0 && !OrderChanged(_page))
 				? $"{ties} suits share a SortIndex with another suit (TIE). The game orders those by the order it loads mod folders, so they can shift when you add, remove or move mods. Saving pins every suit in place."
 				: "";
 			GridHintBar.Visibility = GridHint.Text.Length > 0 || FixTiesButton.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
@@ -583,7 +641,12 @@ namespace OverstrikeBAK.Tabs {
 			_dragStartItem = null;
 			_deferredSelect = false;
 
-			System.Windows.DragDrop.DoDragDrop(SuitsGrid, new DataObject("OverstrikeBAK.Suits", items), DragDropEffects.Move);
+			StartDragScrolling();
+			try {
+				System.Windows.DragDrop.DoDragDrop(SuitsGrid, new DataObject("OverstrikeBAK.Suits", items), DragDropEffects.Move);
+			} finally {
+				StopDragScrolling();
+			}
 			RemoveInsertionAdorner();
 		}
 
@@ -621,16 +684,113 @@ namespace OverstrikeBAK.Tabs {
 				}
 			}
 
-			AutoScroll(e);
 		}
 
-		private void AutoScroll(DragEventArgs e) {
-			var scroll = FindChild<ScrollViewer>(SuitsGrid);
-			if (scroll == null) return;
+		// While dragging, Windows only reports the mouse when it moves (and the mouse wheel not at all), so a timer
+		// scrolls when the mouse is near the top or bottom edge (faster the closer it is), and a hook on this thread's
+		// mouse messages scrolls with the wheel.
+		private const double ScrollZone = 70;      // px from the edge where scrolling starts
+		private const double ScrollMaxSpeed = 1400; // px per second at the edge (and beyond it)
+		private const double WheelStep = 120;       // px per wheel notch
 
-			var y = e.GetPosition(SuitsGrid).Y;
-			if (y < 40) scroll.ScrollToVerticalOffset(scroll.VerticalOffset - 12);
-			else if (y > SuitsGrid.ActualHeight - 40) scroll.ScrollToVerticalOffset(scroll.VerticalOffset + 12);
+		private System.Windows.Threading.DispatcherTimer _scrollTimer;
+		private ScrollViewer _dragScroll;
+		private DateTime _lastScrollTick;
+		private IntPtr _wheelHook = IntPtr.Zero;
+		private Native.HookProc _wheelHookProc; // kept alive while the hook is set
+
+		private void StartDragScrolling() {
+			_dragScroll = FindChild<ScrollViewer>(SuitsGrid);
+			if (_dragScroll == null) return;
+
+			_lastScrollTick = DateTime.UtcNow;
+			_scrollTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(15) };
+			_scrollTimer.Tick += (_, _) => DragScrollTick();
+			_scrollTimer.Start();
+
+			_wheelHookProc = WheelHook;
+			_wheelHook = Native.SetWindowsHookEx(Native.WH_MOUSE, _wheelHookProc, IntPtr.Zero, Native.GetCurrentThreadId());
+		}
+
+		private void StopDragScrolling() {
+			_scrollTimer?.Stop();
+			_scrollTimer = null;
+			if (_wheelHook != IntPtr.Zero) {
+				Native.UnhookWindowsHookEx(_wheelHook);
+				_wheelHook = IntPtr.Zero;
+			}
+			_wheelHookProc = null;
+			_dragScroll = null;
+		}
+
+		/// <summary>The mouse position over the grid (it isn't updated by WPF while dragging).</summary>
+		private Point? MouseOverGrid() {
+			if (!Native.GetCursorPos(out var cursor) || PresentationSource.FromVisual(SuitsGrid) == null) return null;
+			return SuitsGrid.PointFromScreen(new Point(cursor.X, cursor.Y));
+		}
+
+		private void DragScrollTick() {
+			var now = DateTime.UtcNow;
+			var seconds = Math.Min((now - _lastScrollTick).TotalSeconds, 0.05);
+			_lastScrollTick = now;
+
+			if (_dragScroll == null || MouseOverGrid() is not Point p) return;
+			if (p.X < 0 || p.X > SuitsGrid.ActualWidth) return;
+
+			var height = SuitsGrid.ActualHeight;
+			double speed = 0; // -1..1
+			if (p.Y < ScrollZone) speed = -Math.Min(1, (ScrollZone - p.Y) / ScrollZone);
+			else if (p.Y > height - ScrollZone) speed = Math.Min(1, (p.Y - (height - ScrollZone)) / ScrollZone);
+			if (speed == 0) return;
+
+			// eased: slow just inside the zone, full speed at the edge
+			var delta = Math.Sign(speed) * speed * speed * ScrollMaxSpeed * seconds;
+			_dragScroll.ScrollToVerticalOffset(_dragScroll.VerticalOffset + delta);
+		}
+
+		private IntPtr WheelHook(int code, IntPtr wParam, IntPtr lParam) {
+			if (code >= 0 && (int)wParam == Native.WM_MOUSEWHEEL && _dragScroll != null && MouseOverGrid() is Point p
+				&& p.X >= 0 && p.Y >= 0 && p.X <= SuitsGrid.ActualWidth && p.Y <= SuitsGrid.ActualHeight) {
+				var info = System.Runtime.InteropServices.Marshal.PtrToStructure<Native.MOUSEHOOKSTRUCTEX>(lParam);
+				var notches = (short)(info.mouseData >> 16) / 120.0;
+				_dragScroll.ScrollToVerticalOffset(_dragScroll.VerticalOffset - notches * WheelStep);
+				return (IntPtr)1; // handled
+			}
+			return Native.CallNextHookEx(_wheelHook, code, wParam, lParam);
+		}
+
+		private static class Native {
+			public const int WH_MOUSE = 7;
+			public const int WM_MOUSEWHEEL = 0x020A;
+
+			public delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+
+			[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+			public struct POINT { public int X, Y; }
+
+			[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+			public struct MOUSEHOOKSTRUCTEX {
+				public POINT pt;
+				public IntPtr hwnd;
+				public uint wHitTestCode;
+				public IntPtr dwExtraInfo;
+				public uint mouseData;
+			}
+
+			[System.Runtime.InteropServices.DllImport("user32.dll")]
+			public static extern bool GetCursorPos(out POINT point);
+
+			[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+			public static extern IntPtr SetWindowsHookEx(int idHook, HookProc proc, IntPtr hMod, uint threadId);
+
+			[System.Runtime.InteropServices.DllImport("user32.dll")]
+			public static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+			[System.Runtime.InteropServices.DllImport("user32.dll")]
+			public static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+
+			[System.Runtime.InteropServices.DllImport("kernel32.dll")]
+			public static extern uint GetCurrentThreadId();
 		}
 
 		private void SuitsGrid_DragLeave(object sender, DragEventArgs e) {
@@ -694,6 +854,32 @@ namespace OverstrikeBAK.Tabs {
 		}
 
 		/// <summary>
+		/// Hides (or shows again) the suit and the other selected ones, when it's one of them. Saving comments their
+		/// config lines out, so the game skips them; their files stay where they are.
+		/// </summary>
+		private void HideSuit_Click(object sender, RoutedEventArgs e) {
+			if (((FrameworkElement)sender).DataContext is not SuitView view) return;
+
+			var targets = SuitsGrid.SelectedItems.Contains(view) ? SelectedItems() : new List<string> { view.Item };
+			var hide = !view.Hidden;
+			var hidden = HiddenOn(_page);
+
+			if (hide && FullOrder.All(item => hidden.Contains(item) || targets.Contains(item))) {
+				Dialog.Info($"At least one {(IsSingleColumn ? "Batmobile" : "suit")} has to stay in the game.", "Suits Menu");
+				return;
+			}
+
+			foreach (var item in targets) {
+				if (hide) hidden.Add(item);
+				else hidden.Remove(item);
+			}
+
+			_pendingRestoreOriginal = false;
+			RefreshGrid(SelectedItems());
+			UpdateModifiedState();
+		}
+
+		/// <summary>
 		/// Changes the name the game shows, in the mod's own GFxUI.int (so it moves with the mod). When several mod
 		/// folders name the same item, all of them are changed: which one the game uses isn't certain.
 		/// </summary>
@@ -746,14 +932,19 @@ namespace OverstrikeBAK.Tabs {
 			SuitDescriptionLabel.Text = suit.Description;
 			SuitDescriptionLabel.Visibility = string.IsNullOrEmpty(suit.Description) ? Visibility.Collapsed : Visibility.Visible;
 
-			var saved = _savedOrder.TryGetValue(_page, out var s) ? s.IndexOf(suit.Item) + 1 : 0;
-			SuitPositionLabel.Text = view.Position == saved || _pendingRestoreOriginal ? $"{view.Position} of {FullOrder.Count}" : $"{view.Position} of {FullOrder.Count} (now {saved} in game)";
+			var hidden = HiddenOn(_page);
+			var savedHidden = _savedHidden.TryGetValue(_page, out var sh) ? sh : new HashSet<string>();
+			var saved = _savedOrder.TryGetValue(_page, out var s) ? GamePosition(s, savedHidden, suit.Item) : 0;
+			var count = FullOrder.Count(item => !hidden.Contains(item));
+			var now = saved == 0 ? "hidden in game now" : $"now {saved} in game";
+			SuitPositionLabel.Text = view.Hidden ? (saved == 0 || _pendingRestoreOriginal ? "Hidden in game" : $"Hidden in game ({now})")
+				: view.Position == saved || _pendingRestoreOriginal ? $"{view.Position} of {count}" : $"{view.Position} of {count} ({now})";
 			SuitItemLabel.Text = suit.Item;
 			SuitSkinLabel.Text = string.IsNullOrEmpty(suit.Skin) ? "—" : suit.Skin;
 			SuitSourceLabel.Text = string.Join("\n", suit.Sources.Count > 0 ? suit.Sources : new List<string> { suit.SourceLabel });
 
 			var notes = new List<string>();
-			if (suit.WBPlay) notes.Add("Needs a WB Play unlock: the Showcase only lists it once it's unlocked.");
+			if (suit.WBPlay) notes.Add("Locked via WB Play.");
 			else if (!suit.Unlocked) notes.Add("Locked until it's unlocked in the game.");
 			if (suit.Condition == "Unavailable") notes.Add("Marked unavailable in the Showcase.");
 			if (suit.Condition == "RaceOnly") notes.Add("Race only.");
@@ -804,6 +995,7 @@ namespace OverstrikeBAK.Tabs {
 		private void Undo() {
 			var selected = SelectedItems();
 			_order = CloneOrder(_savedOrder);
+			_hidden = CloneHidden(_savedHidden);
 			_pendingRestoreOriginal = false;
 			_forcedPages.Clear();
 			RefreshChips();
@@ -823,10 +1015,11 @@ namespace OverstrikeBAK.Tabs {
 			var model = _model;
 			var restore = _pendingRestoreOriginal;
 
-			// pages to write: the ones changed now, plus the ones this profile already orders
-			var pages = ShowcaseModel.Pages.Where(p => PageChanged(p) || profile.SuitOrder?.Get(p) != null).ToList();
+			// pages to write: the ones reordered now, plus the ones this profile already orders
+			var pages = ShowcaseModel.Pages.Where(p => OrderChanged(p) || profile.SuitOrder?.Get(p) != null).ToList();
 			var order = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 			foreach (var page in pages) order[page] = new List<string>(_order[page]);
+			var hidden = CloneHidden(_hidden);
 
 			SuitOrderWriter.Result result = null;
 			var ok = await _host.RunTask(restore ? "Restoring the original suit order..." : "Saving the suit order...", progress => {
@@ -841,7 +1034,7 @@ namespace OverstrikeBAK.Tabs {
 				SaveOriginalOrderSnapshot(profile, deployments);
 
 				progress("Writing SortIndex values...");
-				result = SuitOrderWriter.Apply(model, order);
+				result = SuitOrderWriter.Apply(model, order, hidden);
 				deployments.SuitOrderProfile = profile.Name;
 				deployments.Save();
 			});
@@ -856,6 +1049,7 @@ namespace OverstrikeBAK.Tabs {
 			} else {
 				var suitOrder = new SuitOrder();
 				foreach (var (page, items) in order) suitOrder.Pages[page] = items;
+				suitOrder.Hidden = hidden.ToDictionary(x => x.Key, x => x.Value.ToList(), StringComparer.OrdinalIgnoreCase);
 				profile.SuitOrder = suitOrder;
 			}
 			_host.SaveProfile();
@@ -864,6 +1058,8 @@ namespace OverstrikeBAK.Tabs {
 			_forcedPages.Clear();
 			_order = new(StringComparer.OrdinalIgnoreCase); // drop edits: reload reads the new state from the files
 			_savedOrder = new(StringComparer.OrdinalIgnoreCase);
+			_hidden = new(StringComparer.OrdinalIgnoreCase);
+			_savedHidden = new(StringComparer.OrdinalIgnoreCase);
 			RequestReload();
 
 			if (result != null && result.Warnings.Count > 0) {
@@ -961,6 +1157,7 @@ namespace OverstrikeBAK.Tabs {
 
 				foreach (var page in ShowcaseModel.Pages) {
 					_order[page] = Merge(page, original.GetPage(page).Select(s => s.Item).ToList());
+					_hidden[page] = new HashSet<string>(); // the original files hide nothing
 				}
 				_forcedPages.Clear();
 				_pendingRestoreOriginal = deployments.SuitOrderProfile != null || ShowcaseModel.Pages.Any(PageChanged);
@@ -976,6 +1173,10 @@ namespace OverstrikeBAK.Tabs {
 				foreach (var page in ShowcaseModel.Pages) {
 					var list = preset.Get(page);
 					if (list != null) _order[page] = Merge(page, list);
+					if (preset.Hidden != null) {
+						var items = _order.TryGetValue(page, out var o) ? o : new List<string>();
+						_hidden[page] = new HashSet<string>(preset.Hidden.TryGetValue(page, out var h) ? h.Where(items.Contains) : Enumerable.Empty<string>());
+					}
 				}
 				_pendingRestoreOriginal = false;
 			}
@@ -1008,6 +1209,7 @@ namespace OverstrikeBAK.Tabs {
 				Directory.CreateDirectory(PresetsDirectory);
 				var order = new SuitOrder();
 				foreach (var (page, items) in _order) order.Pages[page] = new List<string>(items);
+				order.Hidden = _hidden.ToDictionary(x => x.Key, x => x.Value.ToList(), StringComparer.OrdinalIgnoreCase);
 				order.Save(path);
 			} catch (Exception ex) {
 				Dialog.Error($"Couldn't save {prompt.Value}: {ex.Message}", "Suits Menu");

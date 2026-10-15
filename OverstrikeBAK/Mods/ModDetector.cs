@@ -163,7 +163,7 @@ namespace OverstrikeBAK.Mods {
 			foreach (var file in list) {
 				if (!Path.GetFileName(file).Equals("BmGame.ini", StringComparison.OrdinalIgnoreCase)) continue;
 				try {
-					foreach (var (op, _, fields) in ShowcaseIni.Read(TextFile.ReadAllText(file))) {
+					foreach (var (op, _, fields, _) in ShowcaseIni.Read(TextFile.ReadAllText(file))) {
 						if (op == ConfigOp.Remove || op == ConfigOp.Clear) continue;
 						if (fields.Item.Length == 0 || FillerItems.Contains(fields.Item)) continue;
 						var text = $"{fields.Item} ({fields.Page})";

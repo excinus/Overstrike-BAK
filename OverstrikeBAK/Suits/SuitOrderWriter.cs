@@ -17,6 +17,7 @@ namespace OverstrikeBAK.Suits {
 	/// SortIndex (inside its page's range), written into every ShowcaseItems line for that item, in every config
 	/// file that has one. Lines of the same item keep sharing one value, so duplicates (the "BatmanMk2" filler rows
 	/// most skin mods carry) still sort next to each other and the Showcase still shows them once.
+	/// Hidden items have all their lines commented out (see ShowcaseIni.HiddenTag), so the game doesn't list them.
 	/// </summary>
 	internal static class SuitOrderWriter {
 		public class Result {
@@ -24,7 +25,8 @@ namespace OverstrikeBAK.Suits {
 			public List<string> Warnings = new();
 		}
 
-		public static Result Apply(ShowcaseModel model, Dictionary<string, List<string>> order) {
+		/// <param name="hidden">The items to hide on each page; the others are shown. Null: leave hidden items as they are.</param>
+		public static Result Apply(ShowcaseModel model, Dictionary<string, List<string>> order, Dictionary<string, HashSet<string>> hidden = null) {
 			var result = new Result();
 			var indexes = new Dictionary<(string, string), int>();
 
@@ -59,16 +61,25 @@ namespace OverstrikeBAK.Suits {
 					continue;
 				}
 
-				var newText = ShowcaseIni.Process(text.Text, (op, value, fields, line) => {
+				var newText = ShowcaseIni.Process(text.Text, (op, value, fields, line, isHidden) => {
 					if (op == ConfigOp.Clear) return null;
-					if (!indexes.TryGetValue((fields.Page.ToLowerInvariant(), fields.Item), out var index)) return null;
 
-					if (fields.SortIndex == null) {
-						if (warned.Add(fields.Item)) result.Warnings.Add($"'{fields.Item}' in '{file}' has no SortIndex, so it can't be moved.");
-						return null;
+					var newLine = line;
+					if (indexes.TryGetValue((fields.Page.ToLowerInvariant(), fields.Item), out var index)) {
+						if (fields.SortIndex == null) {
+							if (warned.Add(fields.Item)) result.Warnings.Add($"'{fields.Item}' in '{file}' has no SortIndex, so it can't be moved.");
+						} else if (fields.SortIndex != index) {
+							newLine = ShowcaseIni.WithSortIndex(line, index);
+						}
 					}
 
-					return fields.SortIndex == index ? null : ShowcaseIni.WithSortIndex(line, index);
+					// only lines that add an item get hidden (removals stay as they are)
+					var hide = isHidden;
+					if (hidden != null && op != ConfigOp.Remove) {
+						hide = hidden.TryGetValue(fields.Page, out var items) && items.Contains(fields.Item);
+					}
+
+					return hide ? ShowcaseIni.Hide(newLine) : newLine;
 				});
 
 				if (newText == null) continue;

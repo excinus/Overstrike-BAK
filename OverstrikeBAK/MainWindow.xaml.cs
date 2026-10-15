@@ -712,7 +712,7 @@ namespace OverstrikeBAK {
 
 			progress("Writing the suit order...");
 			var model = ShowcaseModel.Build(profile.GamePath, _deployments, ModName, false);
-			SuitOrderWriter.Apply(model, SuitOrder.Resolve(model, profile.SuitOrder));
+			SuitOrderWriter.Apply(model, SuitOrder.Resolve(model, profile.SuitOrder), profile.SuitOrder.HiddenSets());
 			_deployments.SuitOrderProfile = profile.Name;
 			_deployments.Save();
 		}
